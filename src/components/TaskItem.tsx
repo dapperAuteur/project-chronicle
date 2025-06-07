@@ -8,6 +8,7 @@ interface TaskItemProps {
   onClick: (id: string) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (id: string) => void;
+  onEdit: (id: string) => void;
 }
 
 // Notice how we're using the interface to type the props
@@ -17,7 +18,8 @@ export default function TaskItem({
   isActive,
   onClick,
   onDelete,
-  onToggleStatus
+  onToggleStatus,
+  onEdit
 }: TaskItemProps) {
   const containerClasses = `
     bg-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer
@@ -28,6 +30,10 @@ export default function TaskItem({
   //   e.stopPropagation();
   //   onToggleStatus(task.id);
   // };
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(task.id);
+  };
   const handleToggleChange = () => {
     onToggleStatus(task.id);
   };
@@ -48,13 +54,22 @@ export default function TaskItem({
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
           className="w-5 h-5 rounded accent-blue-500"
         />
-        <button 
-          onClick={handleDeleteClick}
-          className="text-red-500 hover:text-red-400"
-          aria-label={`Delete task ${task.name}`}
-        >
-          🗑️ {/* Simple trash can emoji for now */}
-        </button>
+        <div className="flex items-center gap-2"> {/* Wrapper for buttons */}
+          <button 
+            onClick={handleEditClick} // Add handler
+            className="text-blue-500 hover:text-blue-400"
+            aria-label={`Edit task ${task.name}`}
+          >
+            ✏️ {/* Pencil emoji */}
+          </button>
+          <button 
+            onClick={handleDeleteClick}
+            className="text-red-500 hover:text-red-400"
+            aria-label={`Delete task ${task.name}`}
+          >
+            🗑️ {/* Simple trash can emoji for now */}
+          </button>
+        </div>
         <div>
           <h3 className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
             {task.name}

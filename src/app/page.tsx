@@ -11,6 +11,7 @@ export default function Home() {
   const [taskName, setTaskName] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
@@ -92,6 +93,16 @@ export default function Home() {
     setMode('focus');
   };
 
+  const handleStartEditing = (taskId: string) => {
+    const taskToEdit = tasks.find(task => task.id === taskId);
+    if (taskToEdit) {
+      setEditingTaskId(taskId);
+      setTaskName(taskToEdit.name);
+      setTaskCategory(taskToEdit.category);
+      setTaskPriority(taskToEdit.priority);
+    }
+  };
+
   const handleToggleStatus = (taskId: string) => {
     setTasks(prevTasks =>
       prevTasks.map(task =>
@@ -108,31 +119,33 @@ export default function Home() {
     }
   };
 
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Basic validation: Don't add a task if the name is empty.
     if (!taskName.trim()) {
       alert("Task name cannot be empty!"); // We'll use a nicer notification later
       return;
     }
+    // UPDATE LOGIC
+    if (editingTaskId) {
+      setTasks(tasks.map(task => 
+        task.id === editingTaskId 
+          ? { ...task, name: taskName, category: taskCategory, priority: taskPriority }
+          : task
+      ));
+      setEditingTaskId(null);
+    } else {
+      const newTask: Task = {
+        id: crypto.randomUUID(),
+        name: taskName,
+        category: taskCategory,
+        priority: taskPriority,
+        status: 'To Do',
+        pomodorosCompleted: 0,
+      };
+      setTasks([...tasks, newTask]);
+    }
 
-    // 2. Create the new task object.
-    const newTask: Task = {
-      id: crypto.randomUUID(), // Generates a unique random ID
-      name: taskName,
-      category: taskCategory,
-      priority: taskPriority,
-      status: 'To Do',
-      pomodorosCompleted: 0,
-      // We'll add notes later
-    };
-
-    // 3. Add the new task to the existing tasks array.
-    //    The ...tasks part is the "spread" syntax. It copies all existing tasks.
-    setTasks([...tasks, newTask]);
-
-    // 4. Clear the form fields for the next entry.
     setTaskName('');
     setTaskCategory('');
     setTaskPriority('Medium');
@@ -185,7 +198,7 @@ export default function Home() {
         <div>
           <div className="w-full max-w-2xl mb-8">
             <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-            <form onSubmit={handleAddTask} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
               <input
                 type="text"
                 placeholder="Task Name"
@@ -216,8 +229,23 @@ export default function Home() {
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-blue-50"
               >
-                Add Task
+                {editingTaskId ? 'Update Task' : 'Add Task'}
               </button>
+              {editingTaskId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTaskId(null);
+                    setTaskName('');
+                    setTaskCategory('');
+                    setTaskPriority('Medium');
+                  }}
+                  className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
+                >
+                  Cancel
+                </button>
+                )
+              }
             </form>
           </div>
         </div>
@@ -235,6 +263,7 @@ export default function Home() {
                   onClick={setSelectedTaskId}
                   onDelete={handleDeleteTask}
                   onToggleStatus={handleToggleStatus}
+                  onEdit={handleStartEditing}
                 />
               ))}
             </div>
