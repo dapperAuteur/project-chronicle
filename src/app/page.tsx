@@ -7,34 +7,7 @@ const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
 const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
 
 export default function Home() {
-  const [tasks, setTasks] = useState(
-    [
-      {
-        id: '1',
-        name: 'Set up project structure',
-        category: 'Work',
-        priority: 'High',
-        status: 'Done',
-        pomodorosCompleted: 2
-      },
-      {
-        id: '2',
-        name: 'Create Task component',
-        category: 'Work',
-        priority: 'High',
-        status: 'In Progress',
-        pomodorosCompleted: 1
-      },
-      {
-        id: '3',
-        name: 'Read for 30 minutes',
-        category: 'Learning',
-        priority: 'Medium',
-        status: 'To Do',
-        pomodorosCompleted: 0
-      }
-    ]
-  )
+  const [tasks, setTasks] = useState<Task[]>([])
   const [taskName, setTaskName] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
@@ -42,6 +15,18 @@ export default function Home() {
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedTasks = localStorage.getItem('tasks');
+    if (storedTasks) {
+      setTasks(JSON.parse(storedTasks));
+    }
+  }, []); // An empty dependency array means this effect runs only one time.
+
+  useEffect(() => {
+    // localStorage can only store strings, so we convert the array to a JSON string.
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+  }, [tasks]); // The dependency array ensures this runs only when `tasks` is updated.
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
