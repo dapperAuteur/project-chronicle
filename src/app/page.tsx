@@ -35,6 +35,36 @@ export default function Home() {
   const [taskName, setTaskName] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 1. Basic validation: Don't add a task if the name is empty.
+    if (!taskName.trim()) {
+      alert("Task name cannot be empty!"); // We'll use a nicer notification later
+      return;
+    }
+
+    // 2. Create the new task object.
+    const newTask: Task = {
+      id: crypto.randomUUID(), // Generates a unique random ID
+      name: taskName,
+      category: taskCategory,
+      priority: taskPriority,
+      status: 'To Do',
+      pomodorosCompleted: 0,
+      // We'll add notes later
+    };
+
+    // 3. Add the new task to the existing tasks array.
+    //    The ...tasks part is the "spread" syntax. It copies all existing tasks.
+    setTasks([...tasks, newTask]);
+
+    // 4. Clear the form fields for the next entry.
+    setTaskName('');
+    setTaskCategory('');
+    setTaskPriority('Medium');
+  };
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -55,7 +85,7 @@ export default function Home() {
         <div>
           <div className="w-full max-w-2xl mb-8">
             <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-            <form className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
+            <form onSubmit={handleAddTask} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
               <input
                 type="text"
                 placeholder="Task Name"
