@@ -41,6 +41,7 @@ export default function Home() {
   const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
@@ -54,6 +55,29 @@ export default function Home() {
       // Handle session completion here (we'll do this in the next task)
       console.log("Session's over!");
       setIsActive(false); // Stop the timer
+      new Audio('/sounds/its_time.wav').play(); // Make sure you have a sound file in your public/sounds folder
+      // If a focus session just ended
+      if (mode === 'focus') {
+        // If a task was selected, increment its pomodoro count
+        if (selectedTaskId) {
+          setTasks(prevTasks =>
+            prevTasks.map(task =>
+              task.id === selectedTaskId
+                ? { ...task, pomodorosCompleted: task.pomodorosCompleted + 1 }
+                : task
+            )
+          );
+        }
+        // Switch to break mode
+        setMode('break');
+        setTimeRemaining(BREAK_TIME_SECONDS);
+        setIsActive(true); // Automatically start the break
+      } else { // If a break session just ended
+        // Switch to focus mode
+        setMode('focus');
+        setTimeRemaining(FOCUS_TIME_SECONDS);
+        setIsActive(false); // Pause before the next focus session starts
+      }
     }
     // This is the cleanup function.
     // It runs when the component unmounts or before the effect runs again.
@@ -63,7 +87,7 @@ export default function Home() {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeRemaining]); // <-- The Dependency Array
+  }, [isActive, timeRemaining, mode, selectedTaskId]); // <-- The Dependency Array
 
   const toggleTimer = () => {
     setIsActive(!isActive);
@@ -188,7 +212,13 @@ export default function Home() {
             <div className="space-y-4">
               {/* Render the tasks using your new component */}
               {tasks.map(task => (
-                <TaskItem key={task.id} task={task} />
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  isSelected={task.id === selectedTaskId}
+                  isActive={isActive}
+                  onClick={setSelectedTaskId}
+                />
               ))}
             </div>
           </div>
