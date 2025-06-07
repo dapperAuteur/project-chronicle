@@ -15,8 +15,13 @@ export default function Home() {
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [dailyFocus, setDailyFocus] = useState('');
 
   useEffect(() => {
+    const storedFocus = localStorage.getItem('dailyFocus');
+    if (storedFocus) {
+      setDailyFocus(JSON.parse(storedFocus));
+    }
     const storedTasks = localStorage.getItem('tasks');
     if (storedTasks) {
       setTasks(JSON.parse(storedTasks));
@@ -26,7 +31,10 @@ export default function Home() {
   useEffect(() => {
     // localStorage can only store strings, so we convert the array to a JSON string.
     localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]); // The dependency array ensures this runs only when `tasks` is updated.
+  }, [tasks]);
+  useEffect(() => {
+    localStorage.setItem('dailyFocus', JSON.stringify(dailyFocus));
+  }, [dailyFocus]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
@@ -138,8 +146,15 @@ export default function Home() {
         <div>
           <h1>Project Chronicle</h1>
         </div>        
-        <div>
-          <h2>Daily Focus</h2>
+        <div className="w-full max-w-2xl mb-8">
+          <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
+          <input
+            type="text"
+            placeholder="What is your main goal for today?"
+            className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg text-blue-50"
+            value={dailyFocus}
+            onChange={(e) => setDailyFocus(e.target.value)}
+          />
         </div>
         <div>
           <div className="text-center mb-8">
