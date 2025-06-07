@@ -3,6 +3,9 @@ import { useState } from "react";
 import TaskItem from "@/components/TaskItem";
 import { Task } from "@/types/task";
 
+const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
+const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
+
 export default function Home() {
   const [tasks, setTasks] = useState(
     [
@@ -35,6 +38,10 @@ export default function Home() {
   const [taskName, setTaskName] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+  const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
+  const [isActive, setIsActive] = useState(false);
+  const [mode, setMode] = useState<'focus' | 'break'>('focus');
+
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +72,9 @@ export default function Home() {
     setTaskCategory('');
     setTaskPriority('Medium');
   };
+
+  const minutes = Math.floor(timeRemaining / 60);
+  const seconds = timeRemaining % 60;
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -75,12 +85,19 @@ export default function Home() {
           <h2>Daily Focus</h2>
         </div>
         <div>
-          <p text-3xl>25:00</p>
-        </div>
-        <div>
-          <button>Start</button> | 
-          <button>Pause</button> | 
-          <button>Reset</button>
+          <div className="text-center mb-8">
+            <div className="bg-white/10 rounded-lg p-8 inline-block">
+              <h2 className="text-8xl font-bold">
+                {/* Display the formatted time */}
+                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+              </h2>
+            </div>
+            <div className="mt-4 space-x-4">
+              <button>Start</button> | 
+              <button>Pause</button> | 
+              <button>Reset</button>
+            </div>
+          </div>
         </div>
         <div>
           <div className="w-full max-w-2xl mb-8">
