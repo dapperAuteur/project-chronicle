@@ -84,6 +84,15 @@ export default function Home() {
     setMode('focus');
   };
 
+  const handleToggleStatus = (taskId: string) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId
+          ? { ...task, status: task.status === 'Done' ? 'To Do' : 'Done' }
+          : task
+      )
+    );
+  };
   const handleDeleteTask = (taskId: string) => {
     // A simple confirmation dialog.
     if (window.confirm("Are you sure you want to delete this task?")) {
@@ -210,6 +219,7 @@ export default function Home() {
                   isActive={isActive}
                   onClick={setSelectedTaskId}
                   onDelete={handleDeleteTask}
+                  onToggleStatus={handleToggleStatus}
                 />
               ))}
             </div>
