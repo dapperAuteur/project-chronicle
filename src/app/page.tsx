@@ -84,6 +84,12 @@ export default function Home() {
     setMode('focus');
   };
 
+  const handleDeleteTask = (taskId: string) => {
+    // A simple confirmation dialog.
+    if (window.confirm("Are you sure you want to delete this task?")) {
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+    }
+  };
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +209,7 @@ export default function Home() {
                   isSelected={task.id === selectedTaskId}
                   isActive={isActive}
                   onClick={setSelectedTaskId}
+                  onDelete={handleDeleteTask}
                 />
               ))}
             </div>
