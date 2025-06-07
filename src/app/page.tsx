@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TaskItem from "@/components/TaskItem";
 import { Task } from "@/types/task";
 
@@ -41,6 +41,39 @@ export default function Home() {
   const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined = undefined;
+
+    // Only run the timer if it's active and there's time left
+    if (isActive && timeRemaining > 0) {
+      interval = setInterval(() => {
+        setTimeRemaining(time => time - 1);
+      }, 1000);
+    } else if (timeRemaining === 0) {
+      // Handle session completion here (we'll do this in the next task)
+      console.log("Session's over!");
+      setIsActive(false); // Stop the timer
+    }
+    // This is the cleanup function.
+    // It runs when the component unmounts or before the effect runs again.
+    // This is crucial to prevent memory leaks!
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isActive, timeRemaining]); // <-- The Dependency Array
+
+  const toggleTimer = () => {
+    setIsActive(!isActive);
+  };
+
+  const resetTimer = () => {
+    setIsActive(false);
+    setTimeRemaining(FOCUS_TIME_SECONDS);
+    setMode('focus');
+  };
 
 
   const handleAddTask = (e: React.FormEvent) => {
@@ -93,9 +126,20 @@ export default function Home() {
               </h2>
             </div>
             <div className="mt-4 space-x-4">
-              <button>Start</button> | 
-              <button>Pause</button> | 
-              <button>Reset</button>
+              <button
+                onClick={toggleTimer} // <-- Add this
+                className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold w-24"
+              >
+                {
+                  isActive ? 'Pause' : 'Start'
+                }
+              </button>
+              <button
+                onClick={resetTimer} // <-- Add this
+                className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold w-24"
+              >
+                Reset
+              </button>
             </div>
           </div>
         </div>
