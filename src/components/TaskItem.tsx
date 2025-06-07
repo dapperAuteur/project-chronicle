@@ -24,8 +24,11 @@ export default function TaskItem({
     ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-white/20'}
   `;
 
-  const handleToggleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // const handleToggleClick = (e: React.MouseEvent) => {
+  //   e.stopPropagation();
+  //   onToggleStatus(task.id);
+  // };
+  const handleToggleChange = () => {
     onToggleStatus(task.id);
   };
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -40,7 +43,9 @@ export default function TaskItem({
         <input
           type="checkbox"
           checked={task.status === 'Done'}
-          onChange={handleToggleClick} // We'll reuse the click handler logic
+          // onChange={handleToggleClick} // We'll reuse the click handler logic
+          onChange={handleToggleChange}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
           className="w-5 h-5 rounded accent-blue-500"
         />
         <button 
