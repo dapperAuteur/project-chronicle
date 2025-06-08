@@ -1,7 +1,12 @@
 "use client"
 import { useEffect, useState } from "react";
+import { User, onAuthStateChanged, signOut } from "firebase/auth";
+import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
+import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
+import UserProfile from "@/components/UserProfile";
 import { Task } from "@/types/task";
+import Auth from "@/components/Auth";
 
 // const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
 // const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
@@ -21,25 +26,93 @@ export default function Home() {
   const [breakDuration, setBreakDuration] = useState(5);
 
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [taskNotes, setTaskNotes] = useState('');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
-    const storedFocus = localStorage.getItem('dailyFocus');
-    if (storedFocus) {
-      setDailyFocus(JSON.parse(storedFocus));
+    // This will hold the function to unsubscribe from the listener
+    let unsubscribe: (() => void) | undefined;
+
+    const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+
+      // If a user is logged in, set up the tasks listener
+      if (currentUser) {
+        // Point to the 'tasks' collection for the logged-in user
+        const tasksCollection = collection(db, 'users', currentUser.uid, 'tasks');
+        const q = query(tasksCollection);
+
+        // onSnapshot listens for real-time updates
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const tasksData = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Task[];
+          setTasks(tasksData);
+        });
+      } else {
+        // If user is logged out, clear their tasks
+        setTasks([]);
+        // If there was a listener, unsubscribe from it
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      }
+    });
+
+    // Cleanup both subscriptions on unmount
+    return () => {
+      authUnsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []); // This effect should still only run once
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out: ", error);
     }
-    const storedTasks = localStorage.getItem('tasks');
-    if (storedTasks) {
-      setTasks(JSON.parse(storedTasks));
-    }
-  }, []); // An empty dependency array means this effect runs only one time.
+  };
 
   useEffect(() => {
-    // localStorage can only store strings, so we convert the array to a JSON string.
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
-  useEffect(() => {
-    localStorage.setItem('dailyFocus', JSON.stringify(dailyFocus));
-  }, [dailyFocus]);
+    if (!user) return;
+
+    const today = getTodayDateString();
+    const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+
+    // Save the focus whenever it changes, but debounce it to avoid too many writes
+    const handler = setTimeout(() => {
+        if (dailyFocus) { // Only write if there is a focus set
+            setDoc(focusDocRef, { text: dailyFocus }, { merge: true });
+        }
+    }, 1000); // Wait 1 second after user stops typing
+
+    // Load the focus once when the component mounts or user changes
+    const unsubscribe = onSnapshot(focusDocRef, (doc) => {
+        if (doc.exists()) {
+            setDailyFocus(doc.data().text);
+        }
+    });
+
+    return () => {
+        clearTimeout(handler);
+        unsubscribe();
+    };
+  }, [dailyFocus, user]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
@@ -55,14 +128,19 @@ export default function Home() {
       setIsActive(false); // Stop the timer
       new Audio('/sounds/its_time.wav').play();
       if (mode === 'focus') {
-        if (selectedTaskId) {
-          setTasks(prevTasks =>
-            prevTasks.map(task =>
-              task.id === selectedTaskId
-                ? { ...task, pomodorosCompleted: task.pomodorosCompleted + 1 }
-                : task
-            )
-          );
+        if (selectedTaskId && user) {
+          const taskDocRef = doc(db, 'users', user?.uid, 'tasks', selectedTaskId);
+          const taskToUpdate = tasks.find(t => t.id === selectedTaskId);
+          if (taskToUpdate) {
+            const incrementPomodoros = async () => {
+              try {
+                await updateDoc(taskDocRef, { pomodorosCompleted: taskToUpdate.pomodorosCompleted + 1 });
+              } catch (error) {
+                console.error("Error updating pomodoros:", error);
+              }
+            };
+            incrementPomodoros();
+          }
         }
         setMode('break');
         setTimeRemaining(breakDuration * 60);
@@ -78,7 +156,7 @@ export default function Home() {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration]);
+  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration, user, tasks, db]);
 
   const toggleTimer = () => {
     setIsActive(!isActive);
@@ -90,14 +168,14 @@ export default function Home() {
     setTimeRemaining(focusDuration * 60); // Use state instead of constant
   };
 
-  const handleAdjustPomodoros = (taskId: string, amount: number) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId
-          ? { ...task, pomodorosCompleted: task.pomodorosCompleted + amount }
-          : task
-      )
-    );
+  const handleAdjustPomodoros = async (taskId: string, amount: number) => {
+    if (!user) return;
+    const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+    const taskToAdjust = tasks.find(t => t.id === taskId);
+    if (taskToAdjust) {
+      const newCount = taskToAdjust.pomodorosCompleted + amount;
+      await updateDoc(taskDocRef, { pomodorosCompleted: newCount >= 0 ? newCount : 0 });
+    }
   };
 
   const handleStartEditing = (taskId: string) => {
@@ -107,199 +185,228 @@ export default function Home() {
       setTaskName(taskToEdit.name);
       setTaskCategory(taskToEdit.category);
       setTaskPriority(taskToEdit.priority);
+      setTaskNotes(taskToEdit.notes || '');
     }
   };
 
-  const handleToggleStatus = (taskId: string) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId
-          ? { ...task, status: task.status === 'Done' ? 'To Do' : 'Done' }
-          : task
-      )
-    );
+  const handleToggleStatus = async (taskId: string) => {
+    if (!user) return;
+    const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+    const taskToToggle = tasks.find(t => t.id === taskId);
+    if (taskToToggle) {
+      await updateDoc(taskDocRef, { status: taskToToggle.status === 'Done' ? 'To Do' : 'Done' });
+    }
   };
-  const handleDeleteTask = (taskId: string) => {
-    // A simple confirmation dialog.
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user) return;
     if (window.confirm("Are you sure you want to delete this task?")) {
-      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+      const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+      await deleteDoc(taskDocRef);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!taskName.trim()) {
-      alert("Task name cannot be empty!"); // We'll use a nicer notification later
-      return;
-    }
-    // UPDATE LOGIC
+    if (!taskName.trim() || !user) return;
+
     if (editingTaskId) {
-      setTasks(tasks.map(task => 
-        task.id === editingTaskId 
-          ? { ...task, name: taskName, category: taskCategory, priority: taskPriority }
-          : task
-      ));
+      const taskDocRef = doc(db, 'users', user.uid, 'tasks', editingTaskId);
+      await updateDoc(taskDocRef, {
+        name: taskName,
+        category: taskCategory,
+        priority: taskPriority,
+        notes: taskNotes
+      });
       setEditingTaskId(null);
     } else {
-      const newTask: Task = {
-        id: crypto.randomUUID(),
+      const tasksCollectionRef = collection(db, 'users', user.uid, 'tasks');
+      await addDoc(tasksCollectionRef, {
         name: taskName,
         category: taskCategory,
         priority: taskPriority,
         status: 'To Do',
         pomodorosCompleted: 0,
-      };
-      setTasks([...tasks, newTask]);
+        notes: taskNotes,
+      });
     }
-
     setTaskName('');
     setTaskCategory('');
     setTaskPriority('Medium');
+    setTaskNotes('');
   };
 
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <div>
           <h1>Project Chronicle</h1>
-        </div>        
-        <div className="w-full max-w-2xl mb-8">
-          <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
-          <input
-            type="text"
-            placeholder="What is your main goal for today?"
-            className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg text-blue-50"
-            value={dailyFocus}
-            onChange={(e) => setDailyFocus(e.target.value)}
-          />
         </div>
-        <div>
-          <div className="text-center mb-8">
-            <div className="bg-white/10 rounded-lg p-8 inline-block">
-              <h2 className="text-8xl font-bold">
-                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-              </h2>
+        
+        {user ? (
+          <>
+            <div className="w-full max-w-2xl flex justify-between items-center mb-8">
+              <p>Welcome, {user.email}</p>
+              <div className="flex gap-4">
+                <button onClick={() => setIsProfileOpen(true)} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">
+                    Profile
+                  </button>
+                <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold">Sign Out</button>
+              </div>
             </div>
-            <div className="flex justify-center gap-4 mb-4 text-center">
-            <div>
-              <label htmlFor="focus-duration" className="block text-sm text-gray-400">Focus Minutes</label>
-              <input
-                id="focus-duration"
-                type="number"
-                value={focusDuration}
-                onChange={(e) => setFocusDuration(Number(e.target.value))}
-                className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
-                disabled={isActive} // Disable input while timer is running
-              />
+            {
+              isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
+            }
+            <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
+              <div className="w-full max-w-2xl mb-8">
+                <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
+                <input
+                  type="text"
+                  placeholder="What is your main goal for today?"
+                  className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg text-blue-50"
+                  value={dailyFocus}
+                  onChange={(e) => setDailyFocus(e.target.value)}
+                />
               </div>
               <div>
-                <label htmlFor="break-duration" className="block text-sm text-gray-400">Break Minutes</label>
-                <input
-                  id="break-duration"
-                  type="number"
-                  value={breakDuration}
-                  onChange={(e) => setBreakDuration(Number(e.target.value))}
-                  className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
-                  disabled={isActive} // Disable input while timer is running
-                />
+                <div className="text-center mb-8">
+                  <div className="bg-white/10 rounded-lg p-8 inline-block">
+                    <h2 className="text-8xl font-bold">
+                      {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                    </h2>
+                  </div>
+                  <div className="flex justify-center gap-4 mb-4 text-center">
+                  <div>
+                    <label htmlFor="focus-duration" className="block text-sm text-gray-400">Focus Minutes</label>
+                    <input
+                      id="focus-duration"
+                      type="number"
+                      value={focusDuration}
+                      onChange={(e) => setFocusDuration(Number(e.target.value))}
+                      className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
+                      disabled={isActive} // Disable input while timer is running
+                    />
+                    </div>
+                    <div>
+                      <label htmlFor="break-duration" className="block text-sm text-gray-400">Break Minutes</label>
+                      <input
+                        id="break-duration"
+                        type="number"
+                        value={breakDuration}
+                        onChange={(e) => setBreakDuration(Number(e.target.value))}
+                        className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
+                        disabled={isActive} // Disable input while timer is running
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 space-x-4">
+                    <button
+                      onClick={toggleTimer} // <-- Add this
+                      className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold w-24 text-amber-50"
+                    >
+                      {
+                        isActive ? 'Pause' : 'Start'
+                      }
+                    </button>
+                    <button
+                      onClick={resetTimer} // <-- Add this
+                      className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold w-24 text-amber-50"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="mt-4 space-x-4">
-              <button
-                onClick={toggleTimer} // <-- Add this
-                className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold w-24 text-amber-50"
-              >
-                {
-                  isActive ? 'Pause' : 'Start'
-                }
-              </button>
-              <button
-                onClick={resetTimer} // <-- Add this
-                className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold w-24 text-amber-50"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div className="w-full max-w-2xl mb-8">
-            <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-            <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Task Name"
-                className="bg-gray-800 p-2 rounded-md border border-gray-700 text-amber-50"
-                value={taskName}
-                onChange={(e) => setTaskName(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Category"
-                className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
-                value={taskCategory}
-                onChange={(e) => setTaskCategory(e.target.value)}
-              />
-              <select
-               className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
-                value={taskPriority}
-                onChange={(e) => setTaskPriority(e.target.value as 'High' | 'Medium' | 'Low')}>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-              </select>
-              <textarea
-                placeholder="Notes (optional)"
-                className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
-              ></textarea>
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-blue-50"
-              >
-                {editingTaskId ? 'Update Task' : 'Add Task'}
-              </button>
-              {editingTaskId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingTaskId(null);
-                    setTaskName('');
-                    setTaskCategory('');
-                    setTaskPriority('Medium');
-                  }}
-                  className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
-                >
-                  Cancel
-                </button>
-                )
-              }
-            </form>
-          </div>
-        </div>
-        <div>
-          <div className="w-full max-w-2xl">
-            <h2 className="text-2xl font-bold mb-4">Today&apos;s Tasks</h2>
-            <div className="space-y-4">
-              {/* Render the tasks using your new component */}
-              {tasks.map(task => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  isSelected={task.id === selectedTaskId}
-                  isActive={isActive}
-                  onClick={setSelectedTaskId}
-                  onDelete={handleDeleteTask}
-                  onToggleStatus={handleToggleStatus}
-                  onEdit={handleStartEditing}
-                  onAdjustPomodoros={handleAdjustPomodoros}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+              <div>
+                <div className="w-full max-w-2xl mb-8">
+                  <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
+                  <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
+                    <input
+                      type="text"
+                      placeholder="Task Name"
+                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-amber-50"
+                      value={taskName}
+                      onChange={(e) => setTaskName(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Category"
+                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
+                      value={taskCategory}
+                      onChange={(e) => setTaskCategory(e.target.value)}
+                    />
+                    <select
+                    className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
+                      value={taskPriority}
+                      onChange={(e) => setTaskPriority(e.target.value as 'High' | 'Medium' | 'Low')}>
+                      <option>Low</option>
+                      <option>Medium</option>
+                      <option>High</option>
+                    </select>
+                    <textarea
+                      placeholder="Notes (optional)"
+                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-white"
+                      value={taskNotes}
+                      onChange={(e) => setTaskNotes(e.target.value)}
+                     >
+                    </textarea>
+                    <button
+                      type="submit"
+                      className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-blue-50"
+                    >
+                      {editingTaskId ? 'Update Task' : 'Add Task'}
+                    </button>
+                    {editingTaskId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTaskId(null);
+                          setTaskName('');
+                          setTaskCategory('');
+                          setTaskPriority('Medium');
+                          setTaskNotes('');
+                        }}
+                        className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
+                      >
+                        Cancel
+                      </button>
+                      )
+                    }
+                  </form>
+                </div>
+              </div>
+              <div>
+                <div className="w-full max-w-2xl">
+                  <h2 className="text-2xl font-bold mb-4">Today&apos;s Tasks</h2>
+                  <div className="space-y-4">
+                    {/* Render the tasks using your new component */}
+                    {tasks.map(task => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        isSelected={task.id === selectedTaskId}
+                        isActive={isActive}
+                        onClick={setSelectedTaskId}
+                        onDelete={handleDeleteTask}
+                        onToggleStatus={handleToggleStatus}
+                        onEdit={handleStartEditing}
+                        onAdjustPomodoros={handleAdjustPomodoros}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+          </>
+          ) : (
+            <Auth />
+          )}
       </main>
     </div>
   );
