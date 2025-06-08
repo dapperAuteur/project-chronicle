@@ -4,6 +4,7 @@ import { User, onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
+import UserProfile from "@/components/UserProfile";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
 
@@ -27,6 +28,8 @@ export default function Home() {
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [taskNotes, setTaskNotes] = useState('');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -182,6 +185,7 @@ export default function Home() {
       setTaskName(taskToEdit.name);
       setTaskCategory(taskToEdit.category);
       setTaskPriority(taskToEdit.priority);
+      setTaskNotes(taskToEdit.notes || '');
     }
   };
 
@@ -208,7 +212,12 @@ export default function Home() {
 
     if (editingTaskId) {
       const taskDocRef = doc(db, 'users', user.uid, 'tasks', editingTaskId);
-      await updateDoc(taskDocRef, { name: taskName, category: taskCategory, priority: taskPriority });
+      await updateDoc(taskDocRef, {
+        name: taskName,
+        category: taskCategory,
+        priority: taskPriority,
+        notes: taskNotes
+      });
       setEditingTaskId(null);
     } else {
       const tasksCollectionRef = collection(db, 'users', user.uid, 'tasks');
@@ -218,11 +227,13 @@ export default function Home() {
         priority: taskPriority,
         status: 'To Do',
         pomodorosCompleted: 0,
+        notes: taskNotes,
       });
     }
     setTaskName('');
     setTaskCategory('');
     setTaskPriority('Medium');
+    setTaskNotes('');
   };
 
   const minutes = Math.floor(timeRemaining / 60);
@@ -243,8 +254,16 @@ export default function Home() {
           <>
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
               <p>Welcome, {user.email}</p>
-              <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold">Sign Out</button>
+              <div className="flex gap-4">
+                <button onClick={() => setIsProfileOpen(true)} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">
+                    Profile
+                  </button>
+                <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold">Sign Out</button>
+              </div>
             </div>
+            {
+              isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
+            }
             <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
               <div className="w-full max-w-2xl mb-8">
                 <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
@@ -333,8 +352,11 @@ export default function Home() {
                     </select>
                     <textarea
                       placeholder="Notes (optional)"
-                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
-                    ></textarea>
+                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-white"
+                      value={taskNotes}
+                      onChange={(e) => setTaskNotes(e.target.value)}
+                     >
+                    </textarea>
                     <button
                       type="submit"
                       className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-blue-50"
@@ -349,6 +371,7 @@ export default function Home() {
                           setTaskName('');
                           setTaskCategory('');
                           setTaskPriority('Medium');
+                          setTaskNotes('');
                         }}
                         className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
                       >

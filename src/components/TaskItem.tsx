@@ -84,6 +84,10 @@ export default function TaskItem({
           <h3 className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
             {task.name}
           </h3>
+          {task.notes && (
+            <p className="text-sm text-gray-400 mt-1 italic">"{task.notes}"</p>
+            )
+          }
           <p className="text-sm text-gray-400">{task.category}</p>
         </div>
       </div>
