@@ -1,33 +1,38 @@
+// functions/.eslintrc.js
 module.exports = {
-  root: true,
+  root: true, // This is crucial: Stops ESLint from looking up the directory tree
   env: {
     es6: true,
     node: true,
   },
   extends: [
-    "eslint:recommended",
-    "plugin:import/errors",
-    "plugin:import/warnings",
-    "plugin:import/typescript",
-    "google",
-    "plugin:@typescript-eslint/recommended",
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    // DO NOT add 'next' or 'next/core-web-vitals' here
   ],
-  parser: "@typescript-eslint/parser",
-  parserOptions: {
-    project: ["tsconfig.json", "tsconfig.dev.json"],
-    sourceType: "module",
+  globals: {
+    // Add any global variables if needed for Firebase Functions (e.g., functions, admin)
   },
-  ignorePatterns: [
-    "/lib/**/*", // Ignore built files.
-    "/generated/**/*", // Ignore generated files.
-  ],
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    // Ensure these paths correctly point to your functions' tsconfig files
+    project: ['tsconfig.json', 'tsconfig.dev.json'],
+    sourceType: 'module',
+  },
   plugins: [
-    "@typescript-eslint",
-    "import",
+    '@typescript-eslint',
   ],
   rules: {
-    "quotes": ["error", "double"],
-    "import/no-unresolved": 0,
-    "indent": ["error", 2],
+    // Add/customize rules specific to your functions
+    // e.g., 'no-unused-vars': 'off', // Use TypeScript specific rule
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    'indent': ['error', 2], // Example: 2-space indentation
+    'linebreak-style': ['error', 'unix'],
+    'quotes': ['error', 'single'],
+    'semi': ['error', 'always'],
   },
+  ignorePatterns: [
+    '/lib/**/*', // Ignore compiled JavaScript files
+    '*.d.ts',    // Ignore TypeScript declaration files
+  ],
 };
