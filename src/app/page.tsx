@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import TaskItem from "@/components/TaskItem";
 import { Task } from "@/types/task";
 
-const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
-const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
+// const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
+// const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -12,11 +12,15 @@ export default function Home() {
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
+  // const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [dailyFocus, setDailyFocus] = useState('');
+  const [focusDuration, setFocusDuration] = useState(25);
+  const [breakDuration, setBreakDuration] = useState(5);
+
+  const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
 
   useEffect(() => {
     const storedFocus = localStorage.getItem('dailyFocus');
@@ -49,10 +53,8 @@ export default function Home() {
       // Handle session completion here (we'll do this in the next task)
       console.log("Session's over!");
       setIsActive(false); // Stop the timer
-      new Audio('/sounds/its_time.wav').play(); // Make sure you have a sound file in your public/sounds folder
-      // If a focus session just ended
+      new Audio('/sounds/its_time.wav').play();
       if (mode === 'focus') {
-        // If a task was selected, increment its pomodoro count
         if (selectedTaskId) {
           setTasks(prevTasks =>
             prevTasks.map(task =>
@@ -62,26 +64,21 @@ export default function Home() {
             )
           );
         }
-        // Switch to break mode
         setMode('break');
-        setTimeRemaining(BREAK_TIME_SECONDS);
-        setIsActive(true); // Automatically start the break
-      } else { // If a break session just ended
-        // Switch to focus mode
+        setTimeRemaining(breakDuration * 60);
+        setIsActive(true);
+      } else {
         setMode('focus');
-        setTimeRemaining(FOCUS_TIME_SECONDS);
-        setIsActive(false); // Pause before the next focus session starts
+        setTimeRemaining(focusDuration * 60);
+        setIsActive(false);
       }
     }
-    // This is the cleanup function.
-    // It runs when the component unmounts or before the effect runs again.
-    // This is crucial to prevent memory leaks!
     return () => {
       if (interval) {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeRemaining, mode, selectedTaskId]); // <-- The Dependency Array
+  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration]);
 
   const toggleTimer = () => {
     setIsActive(!isActive);
@@ -89,8 +86,8 @@ export default function Home() {
 
   const resetTimer = () => {
     setIsActive(false);
-    setTimeRemaining(FOCUS_TIME_SECONDS);
     setMode('focus');
+    setTimeRemaining(focusDuration * 60); // Use state instead of constant
   };
 
   const handleAdjustPomodoros = (taskId: string, amount: number) => {
@@ -181,16 +178,34 @@ export default function Home() {
         </div>
         <div>
           <div className="text-center mb-8">
-            <div className="bg-white/10 rounded-lg p-8 inline-block">
-              <h2 className="text-8xl font-bold">
-                {/* Display the formatted time */}
-                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-              </h2>
+            <div className="flex justify-center gap-4 mb-4 text-center">
+            <div>
+              <label htmlFor="focus-duration" className="block text-sm text-gray-400">Focus Minutes</label>
+              <input
+                id="focus-duration"
+                type="number"
+                value={focusDuration}
+                onChange={(e) => setFocusDuration(Number(e.target.value))}
+                className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
+                disabled={isActive} // Disable input while timer is running
+              />
+              </div>
+              <div>
+                <label htmlFor="break-duration" className="block text-sm text-gray-400">Break Minutes</label>
+                <input
+                  id="break-duration"
+                  type="number"
+                  value={breakDuration}
+                  onChange={(e) => setBreakDuration(Number(e.target.value))}
+                  className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
+                  disabled={isActive} // Disable input while timer is running
+                />
+              </div>
             </div>
             <div className="mt-4 space-x-4">
               <button
                 onClick={toggleTimer} // <-- Add this
-                className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold w-24"
+                className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold w-24 text-amber-50"
               >
                 {
                   isActive ? 'Pause' : 'Start'
@@ -198,7 +213,7 @@ export default function Home() {
               </button>
               <button
                 onClick={resetTimer} // <-- Add this
-                className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold w-24"
+                className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold w-24 text-amber-50"
               >
                 Reset
               </button>
@@ -212,7 +227,7 @@ export default function Home() {
               <input
                 type="text"
                 placeholder="Task Name"
-                className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
+                className="bg-gray-800 p-2 rounded-md border border-gray-700 text-amber-50"
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
               />
