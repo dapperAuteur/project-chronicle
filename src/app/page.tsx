@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, doc, onSnapshot, query } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import { Task } from "@/types/task";
@@ -27,6 +27,14 @@ export default function Home() {
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
     // This will hold the function to unsubscribe from the listener
@@ -77,24 +85,31 @@ export default function Home() {
     }
   };
 
-  // useEffect(() => {
-  //   const storedFocus = localStorage.getItem('dailyFocus');
-  //   if (storedFocus) {
-  //     setDailyFocus(JSON.parse(storedFocus));
-  //   }
-  //   const storedTasks = localStorage.getItem('tasks');
-  //   if (storedTasks) {
-  //     setTasks(JSON.parse(storedTasks));
-  //   }
-  // }, []); // An empty dependency array means this effect runs only one time.
+  useEffect(() => {
+    if (!user) return;
 
-  // useEffect(() => {
-  //   // localStorage can only store strings, so we convert the array to a JSON string.
-  //   localStorage.setItem('tasks', JSON.stringify(tasks));
-  // }, [tasks]);
-  // useEffect(() => {
-  //   localStorage.setItem('dailyFocus', JSON.stringify(dailyFocus));
-  // }, [dailyFocus]);
+    const today = getTodayDateString();
+    const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+
+    // Save the focus whenever it changes, but debounce it to avoid too many writes
+    const handler = setTimeout(() => {
+        if (dailyFocus) { // Only write if there is a focus set
+            setDoc(focusDocRef, { text: dailyFocus }, { merge: true });
+        }
+    }, 1000); // Wait 1 second after user stops typing
+
+    // Load the focus once when the component mounts or user changes
+    const unsubscribe = onSnapshot(focusDocRef, (doc) => {
+        if (doc.exists()) {
+            setDailyFocus(doc.data().text);
+        }
+    });
+
+    return () => {
+        clearTimeout(handler);
+        unsubscribe();
+    };
+  }, [dailyFocus, user]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
@@ -110,14 +125,19 @@ export default function Home() {
       setIsActive(false); // Stop the timer
       new Audio('/sounds/its_time.wav').play();
       if (mode === 'focus') {
-        if (selectedTaskId) {
-          setTasks(prevTasks =>
-            prevTasks.map(task =>
-              task.id === selectedTaskId
-                ? { ...task, pomodorosCompleted: task.pomodorosCompleted + 1 }
-                : task
-            )
-          );
+        if (selectedTaskId && user) {
+          const taskDocRef = doc(db, 'users', user?.uid, 'tasks', selectedTaskId);
+          const taskToUpdate = tasks.find(t => t.id === selectedTaskId);
+          if (taskToUpdate) {
+            const incrementPomodoros = async () => {
+              try {
+                await updateDoc(taskDocRef, { pomodorosCompleted: taskToUpdate.pomodorosCompleted + 1 });
+              } catch (error) {
+                console.error("Error updating pomodoros:", error);
+              }
+            };
+            incrementPomodoros();
+          }
         }
         setMode('break');
         setTimeRemaining(breakDuration * 60);
@@ -133,7 +153,7 @@ export default function Home() {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration]);
+  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration, user, tasks, db]);
 
   const toggleTimer = () => {
     setIsActive(!isActive);
@@ -145,14 +165,14 @@ export default function Home() {
     setTimeRemaining(focusDuration * 60); // Use state instead of constant
   };
 
-  const handleAdjustPomodoros = (taskId: string, amount: number) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId
-          ? { ...task, pomodorosCompleted: task.pomodorosCompleted + amount }
-          : task
-      )
-    );
+  const handleAdjustPomodoros = async (taskId: string, amount: number) => {
+    if (!user) return;
+    const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+    const taskToAdjust = tasks.find(t => t.id === taskId);
+    if (taskToAdjust) {
+      const newCount = taskToAdjust.pomodorosCompleted + amount;
+      await updateDoc(taskDocRef, { pomodorosCompleted: newCount >= 0 ? newCount : 0 });
+    }
   };
 
   const handleStartEditing = (taskId: string) => {
@@ -165,49 +185,41 @@ export default function Home() {
     }
   };
 
-  const handleToggleStatus = (taskId: string) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId
-          ? { ...task, status: task.status === 'Done' ? 'To Do' : 'Done' }
-          : task
-      )
-    );
+  const handleToggleStatus = async (taskId: string) => {
+    if (!user) return;
+    const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+    const taskToToggle = tasks.find(t => t.id === taskId);
+    if (taskToToggle) {
+      await updateDoc(taskDocRef, { status: taskToToggle.status === 'Done' ? 'To Do' : 'Done' });
+    }
   };
-  const handleDeleteTask = (taskId: string) => {
-    // A simple confirmation dialog.
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user) return;
     if (window.confirm("Are you sure you want to delete this task?")) {
-      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+      const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+      await deleteDoc(taskDocRef);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!taskName.trim()) {
-      alert("Task name cannot be empty!"); // We'll use a nicer notification later
-      return;
-    }
-    // UPDATE LOGIC
+    if (!taskName.trim() || !user) return;
+
     if (editingTaskId) {
-      setTasks(tasks.map(task => 
-        task.id === editingTaskId 
-          ? { ...task, name: taskName, category: taskCategory, priority: taskPriority }
-          : task
-      ));
+      const taskDocRef = doc(db, 'users', user.uid, 'tasks', editingTaskId);
+      await updateDoc(taskDocRef, { name: taskName, category: taskCategory, priority: taskPriority });
       setEditingTaskId(null);
     } else {
-      const newTask: Task = {
-        id: crypto.randomUUID(),
+      const tasksCollectionRef = collection(db, 'users', user.uid, 'tasks');
+      await addDoc(tasksCollectionRef, {
         name: taskName,
         category: taskCategory,
         priority: taskPriority,
         status: 'To Do',
         pomodorosCompleted: 0,
-      };
-      setTasks([...tasks, newTask]);
+      });
     }
-
     setTaskName('');
     setTaskCategory('');
     setTaskPriority('Medium');
