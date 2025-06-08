@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
@@ -10,7 +10,16 @@ import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
 import GoalManager from "@/components/GoalManager";
 import DailyReflection from '@/components/DailyReflection';
+import StreakDisplay from "@/components/StreakDisplay";
 
+const categoryKeywords: { [key: string]: string[] } = {
+  'Work': ['project', 'report', 'meeting', 'presentation', 'deadline'],
+  'Learning': ['learn', 'study', 'read', 'course', 'tutorial'],
+  'Communication': ['call', 'email', 'message', 'chat', 'contact'],
+  'Health': ['workout', 'gym', 'run', 'meditate', 'doctor'],
+  'Personal': ['errand', 'buy', 'shop', 'clean', 'organize'],
+  'Design': ['design', 'mockup', 'figma', 'prototype', 'sketch'],
+};
 
 export default function Home() {
   // Component State
@@ -19,6 +28,8 @@ export default function Home() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [topStreaks, setTopStreaks] = useState<number[]>([]);
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -53,6 +64,43 @@ export default function Home() {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const categoryManuallySet = useRef(false);
+
+  useEffect(() => {
+    // If the user has already typed in the category box, don't override them.
+    if (categoryManuallySet.current) {
+      return;
+    }
+
+    const lowerCaseTaskName = taskName.toLowerCase();
+
+    // Find the first category that has a keyword matching the task name
+    const suggestedCategory = Object.keys(categoryKeywords).find(category =>
+      categoryKeywords[category].some(keyword => lowerCaseTaskName.includes(keyword))
+    );
+
+    if (suggestedCategory) {
+      setTaskCategory(suggestedCategory);
+    }
+    // If no keyword matches, we don't change the category
+    
+  }, [taskName]);
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    categoryManuallySet.current = true; // Mark as manually changed
+    setTaskCategory(e.target.value);
+  };
+
+  // NEW: When the form is submitted, reset the manual override flag
+  const resetFormState = () => {
+    setTaskName('');
+    setTaskCategory('');
+    setTaskPriority('Medium');
+    setTaskNotes('');
+    setEditingTaskId(null);
+    categoryManuallySet.current = false; // Reset for the next new task
   };
 
   useEffect(() => {
@@ -93,10 +141,12 @@ export default function Home() {
     await deleteDoc(goalDocRef);
   };
 
+  // Main Data Loading useEffect
   useEffect(() => {
     let tasksUnsubscribe: (() => void) | undefined;
     let goalsUnsubscribe: (() => void) | undefined;
     let reflectionUnsubscribe: (() => void) | undefined;
+    let statsUnsubscribe: (() => void) | undefined;
 
     const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -125,14 +175,30 @@ export default function Home() {
             setReflectionText('');
           }
         });
+
+        const statsDocRef = doc(db, 'users', currentUser.uid, 'stats', 'user_stats');
+          statsUnsubscribe = onSnapshot(statsDocRef, (doc) => {
+            if (doc.exists()) {
+              const data = doc.data();
+              setStreak(doc.data().reflectionStreak || 0);
+              setTopStreaks(data.topStreaks || []);
+            } else {
+              setStreak(0);
+              setTopStreaks([]);
+            }
+          }
+        );
       } else {
         // Clear all data on logout
         setTasks([]);
         setGoals([]);
         setReflectionText('');
+        setStreak(0);
+        setTopStreaks([]);
         if (tasksUnsubscribe) tasksUnsubscribe();
         if (goalsUnsubscribe) goalsUnsubscribe();
         if (reflectionUnsubscribe) reflectionUnsubscribe();
+        if (statsUnsubscribe) statsUnsubscribe();
       }
     });
 
@@ -141,14 +207,64 @@ export default function Home() {
       if (tasksUnsubscribe) tasksUnsubscribe();
       if (goalsUnsubscribe) goalsUnsubscribe();
       if (reflectionUnsubscribe) reflectionUnsubscribe();
+      if (statsUnsubscribe) statsUnsubscribe();
     };
   }, []);
 
   const handleSaveReflection = async (newReflectionText: string) => {
     if (!user) return;
-    const today = getTodayDateString();
-    const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', today);
-    await setDoc(reflectionDocRef, { text: newReflectionText, date: today }, { merge: true });
+    const todayStr = getTodayDateString();
+    const statsDocRef = doc(db, 'users', user.uid, 'stats', 'user_stats');
+
+    const statsDoc = await getDoc(statsDocRef);
+    let currentStreak = 0;
+    let lastDate = '';
+    let currentTopStreaks: number[] = [];
+    
+    if (statsDoc.exists()) {
+      const data = statsDoc.data();
+      lastDate = data.lastReflectionDate;
+      currentStreak = data.reflectionStreak || 0;
+      currentTopStreaks = data.topStreaks || [];
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if(lastDate === todayStr){
+      // Already reflected today, do nothing to streak
+    } else if (lastDate === yesterdayStr) {
+      // Maintained the streak
+      currentStreak++;
+    } else {
+      // --- Streak is BROKEN ---
+      // Check if the broken streak should be added to the leaderboard
+      if (currentStreak > 0) {
+        currentTopStreaks.push(currentStreak);
+        // Sort descending and keep only the top 5
+        currentTopStreaks.sort((a, b) => b - a);
+        if (currentTopStreaks.length > 5) {
+            currentTopStreaks = currentTopStreaks.slice(0, 5);
+        }
+      }
+      // Missed a day, reset streak
+      currentStreak = 1;
+    }
+    const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', todayStr);
+    await setDoc(reflectionDocRef, {
+      text: newReflectionText, date: todayStr
+      }, {
+        merge: true
+      }
+    );
+    await setDoc(statsDocRef, { 
+        reflectionStreak: currentStreak, 
+        lastReflectionDate: todayStr,
+        topStreaks: currentTopStreaks
+      }, {
+        merge: true
+      }
+    );
     setReflectionText(newReflectionText); // Update local state immediately
   };
 
@@ -391,10 +507,7 @@ export default function Home() {
         updatedAt: new Date().toISOString().slice(0, 10),
       });
     }
-    setTaskName('');
-    setTaskCategory('');
-    setTaskPriority('Medium');
-    setTaskNotes('');
+    resetFormState();
   };
 
   const minutes = Math.floor(timeRemaining / 60);
@@ -416,6 +529,7 @@ export default function Home() {
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
               <div>
                 <p className="text-l font-bold mb-4 text-white">Welcome, {user.email}</p>
+                <StreakDisplay count={streak} />
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setIsGoalManagerOpen(true)} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white">
@@ -438,7 +552,14 @@ export default function Home() {
               )
             }
             {
-              isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
+              isProfileOpen && user && (
+                <UserProfile
+                  user={user}
+                  topStreaks={topStreaks}
+                  onClose={
+                    () => setIsProfileOpen(false)} 
+                />
+              )
             }
             {
               isReflectionOpen && (
@@ -560,7 +681,7 @@ export default function Home() {
                       placeholder="Category"
                       className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
                       value={taskCategory}
-                      onChange={(e) => setTaskCategory(e.target.value)}
+                      onChange={handleCategoryChange}
                     />
                     <select
                     className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"

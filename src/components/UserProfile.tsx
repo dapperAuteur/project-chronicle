@@ -5,10 +5,11 @@ import { User, updatePassword, deleteUser, updateEmail } from 'firebase/auth';
 
 interface UserProfileProps {
   user: User;
+  topStreaks: number[];
   onClose: () => void;
 }
 
-export default function UserProfile({ user, onClose }: UserProfileProps) {
+export default function UserProfile({ user, topStreaks, onClose }: UserProfileProps) {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -74,7 +75,21 @@ export default function UserProfile({ user, onClose }: UserProfileProps) {
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
         <h2 className="text-2xl font-bold mb-4">Profile Settings</h2>
-
+        <div className="mb-6">
+          <h3 className="font-bold mb-2 text-lg text-amber-400">Your Top 5 Streaks</h3>
+          <ol className="list-decimal list-inside bg-white/5 p-3 rounded-md space-y-1">
+              {topStreaks.length > 0 ? (
+                  topStreaks.map((streak, index) => (
+                      <li key={index} className="flex justify-between">
+                          <span>{index + 1}.</span>
+                          <span>{streak} Days</span>
+                      </li>
+                  ))
+              ) : (
+                  <p className="text-gray-400 text-sm">Complete some reflections to build a streak!</p>
+              )}
+          </ol>
+        </div>
         {message && <p className="text-green-400 mb-4">{message}</p>}
         {error && <p className="text-red-400 mb-4">{error}</p>}
 
