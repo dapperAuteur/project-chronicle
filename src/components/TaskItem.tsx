@@ -85,7 +85,7 @@ export default function TaskItem({
             {task.name}
           </h3>
           {task.notes && (
-            <p className="text-sm text-gray-400 mt-1 italic">"{task.notes}"</p>
+            <p className="text-sm text-gray-400 mt-1 italic">&quot;{task.notes}&quot;</p>
             )
           }
           <p className="text-sm text-gray-400">{task.category}</p>
