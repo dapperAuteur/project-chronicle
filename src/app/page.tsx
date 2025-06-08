@@ -156,16 +156,56 @@ export default function Home() {
   };
 
   const handleDraftReflection = async () => {
-    // This is where we will call our AI API in the next step
-    // For now, it just simulates the loading state
     setIsDraftingAI(true);
-    console.log("Drafting with AI...");
-    // Simulate a network call
-    setTimeout(() => {
-        // In the future, this will be the text from the AI
-        setReflectionText("This is a placeholder summary from the AI."); 
-        setIsDraftingAI(false);
-    }, 2000);
+    
+    // 1. Find the full name of the selected focus goal.
+    const focusGoal = goals.find(g => g.id === selectedFocusGoalId);
+    if (!focusGoal) {
+      alert("Please select a daily focus goal first.");
+      setIsDraftingAI(false);
+      return;
+    }
+
+    // 2. Filter for today's completed tasks.
+    const completedTasks = tasks
+      .filter(task => task.status === 'Done')
+      .map(task => task.name);
+
+    if (completedTasks.length === 0) {
+      alert("You haven't completed any tasks yet! The AI needs something to summarize.");
+      setIsDraftingAI(false);
+      return;
+    }
+
+    try {
+      // 3. Call our own API endpoint.
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          focusGoal: focusGoal.name,
+          completedTasks: completedTasks,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get a summary from the AI.');
+      }
+
+      const data = await response.json();
+      
+      // 4. Update the reflection text with the AI's summary.
+      setReflectionText(data.summary);
+
+    } catch (error) {
+      console.error("Error drafting reflection:", error);
+      alert("Sorry, there was an error connecting to the AI. Please try again.");
+    } finally {
+      // 5. Always turn off the loading state.
+      setIsDraftingAI(false);
+    }
   };
 
   const handleSignOut = async () => {
