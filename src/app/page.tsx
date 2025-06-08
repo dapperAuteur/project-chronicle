@@ -93,6 +93,16 @@ export default function Home() {
     setMode('focus');
   };
 
+  const handleAdjustPomodoros = (taskId: string, amount: number) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId
+          ? { ...task, pomodorosCompleted: task.pomodorosCompleted + amount }
+          : task
+      )
+    );
+  };
+
   const handleStartEditing = (taskId: string) => {
     const taskToEdit = tasks.find(task => task.id === taskId);
     if (taskToEdit) {
@@ -264,6 +274,7 @@ export default function Home() {
                   onDelete={handleDeleteTask}
                   onToggleStatus={handleToggleStatus}
                   onEdit={handleStartEditing}
+                  onAdjustPomodoros={handleAdjustPomodoros}
                 />
               ))}
             </div>
