@@ -16,7 +16,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 // To prevent re-initializing on hot reloads in development, we check if an app already exists.
-let app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 const db = getFirestore(app);
 enableIndexedDbPersistence(db)

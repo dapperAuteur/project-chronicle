@@ -24,9 +24,13 @@ export default function UserProfile({ user, onClose }: UserProfileProps) {
       setNewEmail('');
       setError('');
       setMessage('Email updated successfully! A verification email has been sent to your new address.');
-    } catch (err: any) {
-      setMessage('');
-      setError('Error updating email. Please sign out and log back in, then try again. ' + err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setMessage('');
+        setError('Error updating email. Please sign out and log back in, then try again. ' + err.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
     }
   };
 
@@ -40,9 +44,13 @@ export default function UserProfile({ user, onClose }: UserProfileProps) {
       setNewPassword('');
       setError('');
       setMessage('Password updated successfully!');
-    } catch (err: any) {
-      setMessage('');
-      setError('Error updating password. You may need to sign out and log back in first. ' + err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setMessage('');
+        setError('Error updating password. You may need to sign out and log back in first. ' + err.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
     }
   };
 
@@ -51,9 +59,13 @@ export default function UserProfile({ user, onClose }: UserProfileProps) {
       try {
         await deleteUser(user);
         // The onAuthStateChanged listener will handle redirecting to the login page.
-      } catch (err: any) {
-        setMessage('');
-        setError('Error deleting account. You may need to sign out and log back in first. ' + err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setMessage('');
+          setError('Error deleting account. You may need to sign out and log back in first. ' + err.message);
+        } else {
+          setError('An unexpected error occurred.');
+        }
       }
     }
   };

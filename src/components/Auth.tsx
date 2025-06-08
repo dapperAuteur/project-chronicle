@@ -1,6 +1,6 @@
 'use client';
 
-import { FirebaseError } from "firebase/app";
+// import { FirebaseError } from "firebase/app";
 import { useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { 
