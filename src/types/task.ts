@@ -7,4 +7,6 @@ export interface Task {
   dueDate?: string;
   pomodorosCompleted: number;
   notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }

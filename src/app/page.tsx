@@ -9,7 +9,6 @@ import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
 import GoalManager from "@/components/GoalManager";
-
 import DailyReflection from '@/components/DailyReflection';
 
 
@@ -154,9 +153,7 @@ export default function Home() {
   };
 
   const handleDraftReflection = async () => {
-    setIsDraftingAI(true);
-    console.log("handleDraftReflection");
-    
+    setIsDraftingAI(true);    
     
     // 1. Find the full name of the selected focus goal.
     const focusGoal = goals.find(g => g.id === selectedFocusGoalId);
@@ -167,11 +164,15 @@ export default function Home() {
     }
 
     // 2. Filter for today's completed tasks.
-    const completedTasks = tasks
-      .filter(task => task.status === 'Done')
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const completedTodayTasks = tasks
+      .filter(task =>
+        task.status === 'Done' &&
+        task.updatedAt?.slice(0, 10) === todayStr
+      )
       .map(task => task.name);
 
-    if (completedTasks.length === 0) {
+    if (completedTodayTasks.length === 0) {
       alert("You haven't completed any tasks yet! The AI needs something to summarize.");
       setIsDraftingAI(false);
       return;
@@ -186,7 +187,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           focusGoal: focusGoal.name,
-          completedTasks: completedTasks,
+          completedTasks: completedTodayTasks,
         }),
       });
 
@@ -195,6 +196,8 @@ export default function Home() {
       }
 
       const data = await response.json();
+
+      await handleSaveReflection(data.summary);
       
       // 4. Update the reflection text with the AI's summary.
       setReflectionText(data.summary);
@@ -280,7 +283,10 @@ export default function Home() {
           if (taskToUpdate) {
             const incrementPomodoros = async () => {
               try {
-                await updateDoc(taskDocRef, { pomodorosCompleted: taskToUpdate.pomodorosCompleted + 1 });
+                await updateDoc(taskDocRef, {
+                  pomodorosCompleted: taskToUpdate.pomodorosCompleted + 1,
+                  updatedAt: new Date().toISOString(),
+                });
               } catch (error) {
                 console.error("Error updating pomodoros:", error);
               }
@@ -320,7 +326,10 @@ export default function Home() {
     const taskToAdjust = tasks.find(t => t.id === taskId);
     if (taskToAdjust) {
       const newCount = taskToAdjust.pomodorosCompleted + amount;
-      await updateDoc(taskDocRef, { pomodorosCompleted: newCount >= 0 ? newCount : 0 });
+      await updateDoc(taskDocRef, {
+        pomodorosCompleted: newCount >= 0 ? newCount : 0,
+        updatedAt: new Date().toISOString(),
+      });
     }
   };
 
@@ -340,7 +349,10 @@ export default function Home() {
     const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
     const taskToToggle = tasks.find(t => t.id === taskId);
     if (taskToToggle) {
-      await updateDoc(taskDocRef, { status: taskToToggle.status === 'Done' ? 'To Do' : 'Done' });
+      await updateDoc(taskDocRef, {
+        status: taskToToggle.status === 'Done' ? 'To Do' : 'Done',
+        updatedAt: new Date().toISOString(),
+      });
     }
   };
   const handleDeleteTask = async (taskId: string) => {
@@ -362,7 +374,8 @@ export default function Home() {
         name: taskName,
         category: taskCategory,
         priority: taskPriority,
-        notes: taskNotes
+        notes: taskNotes,
+        updatedAt: new Date().toISOString().slice(0, 10),
       });
       setEditingTaskId(null);
     } else {
@@ -374,6 +387,8 @@ export default function Home() {
         status: 'To Do',
         pomodorosCompleted: 0,
         notes: taskNotes,
+        createdAt: new Date().toISOString().slice(0, 10),
+        updatedAt: new Date().toISOString().slice(0, 10),
       });
     }
     setTaskName('');
