@@ -8,7 +8,6 @@ import UserProfile from "@/components/UserProfile";
 import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
-import StreakDisplay from "@/components/StreakDisplay";
 import GoalManager from "@/components/GoalManager";
 
 import DailyReflection from '@/components/DailyReflection';
@@ -44,7 +43,6 @@ export default function Home() {
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
-  const [streak, setStreak] = useState(0);
 
   // NEW: Daily Reflection State
   const [reflectionText, setReflectionText] = useState('');
@@ -157,6 +155,8 @@ export default function Home() {
 
   const handleDraftReflection = async () => {
     setIsDraftingAI(true);
+    console.log("handleDraftReflection");
+    
     
     // 1. Find the full name of the selected focus goal.
     const focusGoal = goals.find(g => g.id === selectedFocusGoalId);
@@ -302,7 +302,7 @@ export default function Home() {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration, user, tasks, db]);
+  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration, user, tasks, /*db**/]);
 
   const toggleTimer = () => {
     setIsActive(!isActive);
@@ -401,7 +401,6 @@ export default function Home() {
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
               <div>
                 <p className="text-l font-bold mb-4 text-white">Welcome, {user.email}</p>
-                <StreakDisplay count={streak} />
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setIsGoalManagerOpen(true)} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white">
