@@ -62,7 +62,6 @@ export default function TaskItem({
           // onChange={handleToggleClick} // We'll reuse the click handler logic
           onChange={handleToggleChange}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
-          className="w-5 h-5 rounded accent-blue-500"
         />
         <div className="flex items-center gap-2"> {/* Wrapper for buttons */}
           <button 
@@ -85,7 +84,7 @@ export default function TaskItem({
             {task.name}
           </h3>
           {task.notes && (
-            <p className="text-sm text-gray-400 mt-1 italic">"{task.notes}"</p>
+            <p className="text-sm text-gray-400 mt-1 italic">&quot;{task.notes}&quot;</p>
             )
           }
           <p className="text-sm text-gray-400">{task.category}</p>

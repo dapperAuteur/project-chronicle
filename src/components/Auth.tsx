@@ -31,29 +31,27 @@ export default function Auth() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto mt-8">
-      <div className="bg-white/10 p-6 rounded-lg shadow-lg">
+    <div className="w-full max-w-2xl mb-8 mx-auto">
+      <div className="bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-700">
         <div className="mb-4">
-          <label htmlFor="email" className="block text-gray-300 text-sm font-bold mb-2">Email</label>
+          <label htmlFor="email" className="block text-xl font-bold mb-2 text-gray-300">Email</label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full bg-gray-800 p-2 rounded-md border border-gray-700 text-white"
           />
         </div>
         <div className="mb-6">
-          <label htmlFor="password" className="block text-gray-300 text-sm font-bold mb-2">Password</label>
+          <label htmlFor="password" className="block text-xl font-bold mb-2 text-gray-300">Password</label>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full bg-gray-800 p-2 rounded-md border border-gray-700 text-white"
-          />
+            />
         </div>
         <div className="flex items-center justify-between gap-4">
           <button onClick={handleSignUp} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">

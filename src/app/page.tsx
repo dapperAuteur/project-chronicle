@@ -1,35 +1,54 @@
 "use client"
 import { useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import UserProfile from "@/components/UserProfile";
+import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
+import StreakDisplay from "@/components/StreakDisplay";
+import GoalManager from "@/components/GoalManager";
 
-// const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
-// const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
+import DailyReflection from '@/components/DailyReflection';
+
 
 export default function Home() {
+  // Component State
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
+  const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+
+  // Data State
   const [tasks, setTasks] = useState<Task[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
+
+  // Daily Focus State
+  const [selectedFocusGoalId, setSelectedFocusGoalId] = useState<string | null>(null);
+  const [dailyMission, setDailyMission] = useState('');
+
+  // Form State
   const [taskName, setTaskName] = useState('');
+  const [taskNotes, setTaskNotes] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  // const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
+
+  // Timer State
+  const [focusDuration, setFocusDuration] = useState(25);
+  const [breakDuration, setBreakDuration] = useState(5);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [dailyFocus, setDailyFocus] = useState('');
-  const [focusDuration, setFocusDuration] = useState(25);
-  const [breakDuration, setBreakDuration] = useState(5);
-
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [taskNotes, setTaskNotes] = useState('');
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [streak, setStreak] = useState(0);
+
+  // NEW: Daily Reflection State
+  const [reflectionText, setReflectionText] = useState('');
+  const [isDraftingAI, setIsDraftingAI] = useState(false);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -40,45 +59,154 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // This will hold the function to unsubscribe from the listener
-    let unsubscribe: (() => void) | undefined;
+    if (!user) {
+      setGoals([]);
+      return;
+    }
+
+    const goalsCollection = collection(db, 'users', user.uid, 'goals');
+    const q = query(goalsCollection);
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const goalsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Goal[];
+      setGoals(goalsData);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSaveGoal = async (goalName: string, goalId?: string) => {
+    if (!user) return;
+    const goalsCollectionRef = collection(db, 'users', user.uid, 'goals');
+
+    if (goalId) { // Editing existing goal
+      const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+      await updateDoc(goalDocRef, { name: goalName });
+    } else { // Adding new goal
+      await addDoc(goalsCollectionRef, { name: goalName });
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!user) return;
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await deleteDoc(goalDocRef);
+  };
+
+  useEffect(() => {
+    let tasksUnsubscribe: (() => void) | undefined;
+    let goalsUnsubscribe: (() => void) | undefined;
+    let reflectionUnsubscribe: (() => void) | undefined;
 
     const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
 
-      // If a user is logged in, set up the tasks listener
       if (currentUser) {
-        // Point to the 'tasks' collection for the logged-in user
+        // Fetch Tasks
         const tasksCollection = collection(db, 'users', currentUser.uid, 'tasks');
-        const q = query(tasksCollection);
+        tasksUnsubscribe = onSnapshot(query(tasksCollection), (snapshot) => {
+          setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[]);
+        });
 
-        // onSnapshot listens for real-time updates
-        unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const tasksData = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Task[];
-          setTasks(tasksData);
+        // Fetch Goals
+        const goalsCollection = collection(db, 'users', currentUser.uid, 'goals');
+        goalsUnsubscribe = onSnapshot(query(goalsCollection), (snapshot) => {
+          setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Goal[]);
+        });
+
+        // NEW: Fetch today's reflection
+        const today = getTodayDateString();
+        const reflectionDocRef = doc(db, 'users', currentUser.uid, 'daily_reflection', today);
+        reflectionUnsubscribe = onSnapshot(reflectionDocRef, (doc) => {
+          if (doc.exists()) {
+            setReflectionText(doc.data().text);
+          } else {
+            setReflectionText('');
+          }
         });
       } else {
-        // If user is logged out, clear their tasks
+        // Clear all data on logout
         setTasks([]);
-        // If there was a listener, unsubscribe from it
-        if (unsubscribe) {
-          unsubscribe();
-        }
+        setGoals([]);
+        setReflectionText('');
+        if (tasksUnsubscribe) tasksUnsubscribe();
+        if (goalsUnsubscribe) goalsUnsubscribe();
+        if (reflectionUnsubscribe) reflectionUnsubscribe();
       }
     });
 
-    // Cleanup both subscriptions on unmount
     return () => {
       authUnsubscribe();
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (tasksUnsubscribe) tasksUnsubscribe();
+      if (goalsUnsubscribe) goalsUnsubscribe();
+      if (reflectionUnsubscribe) reflectionUnsubscribe();
     };
-  }, []); // This effect should still only run once
+  }, []);
+
+  const handleSaveReflection = async (newReflectionText: string) => {
+    if (!user) return;
+    const today = getTodayDateString();
+    const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', today);
+    await setDoc(reflectionDocRef, { text: newReflectionText, date: today }, { merge: true });
+    setReflectionText(newReflectionText); // Update local state immediately
+  };
+
+  const handleDraftReflection = async () => {
+    setIsDraftingAI(true);
+    
+    // 1. Find the full name of the selected focus goal.
+    const focusGoal = goals.find(g => g.id === selectedFocusGoalId);
+    if (!focusGoal) {
+      alert("Please select a daily focus goal first.");
+      setIsDraftingAI(false);
+      return;
+    }
+
+    // 2. Filter for today's completed tasks.
+    const completedTasks = tasks
+      .filter(task => task.status === 'Done')
+      .map(task => task.name);
+
+    if (completedTasks.length === 0) {
+      alert("You haven't completed any tasks yet! The AI needs something to summarize.");
+      setIsDraftingAI(false);
+      return;
+    }
+
+    try {
+      // 3. Call our own API endpoint.
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          focusGoal: focusGoal.name,
+          completedTasks: completedTasks,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get a summary from the AI.');
+      }
+
+      const data = await response.json();
+      
+      // 4. Update the reflection text with the AI's summary.
+      setReflectionText(data.summary);
+
+    } catch (error) {
+      console.error("Error drafting reflection:", error);
+      alert("Sorry, there was an error connecting to the AI. Please try again.");
+    } finally {
+      // 5. Always turn off the loading state.
+      setIsDraftingAI(false);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -89,30 +217,48 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setSelectedFocusGoalId(null);
+      setDailyMission('');
+      return;
+    }
 
-    const today = getTodayDateString();
-    const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+    const getInitialFocus = async () => {
+      const today = getTodayDateString();
+      const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+      const docSnap = await getDoc(focusDocRef);
 
-    // Save the focus whenever it changes, but debounce it to avoid too many writes
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSelectedFocusGoalId(data.goalId || null);
+        setDailyMission(data.mission || '');
+      }
+    };
+
+    getInitialFocus();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !selectedFocusGoalId) {
+      return;
+    }
+
     const handler = setTimeout(() => {
-        if (dailyFocus) { // Only write if there is a focus set
-            setDoc(focusDocRef, { text: dailyFocus }, { merge: true });
-        }
-    }, 1000); // Wait 1 second after user stops typing
+      const today = getTodayDateString();
+      const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+      const selectedGoal = goals.find(g => g.id === selectedFocusGoalId);
 
-    // Load the focus once when the component mounts or user changes
-    const unsubscribe = onSnapshot(focusDocRef, (doc) => {
-        if (doc.exists()) {
-            setDailyFocus(doc.data().text);
-        }
-    });
+      setDoc(focusDocRef, { 
+        goalId: selectedFocusGoalId,
+        goalName: selectedGoal?.name || '', // Store the name for convenience
+        mission: dailyMission 
+      });
+    }, 1000); // Debounced save
 
     return () => {
-        clearTimeout(handler);
-        unsubscribe();
+      clearTimeout(handler);
     };
-  }, [dailyFocus, user]);
+  }, [selectedFocusGoalId, dailyMission, user, goals]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
@@ -240,21 +386,27 @@ export default function Home() {
   const seconds = timeRemaining % 60;
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <p className="flex min-h-screen items-center justify-center">Loading...</p>;
   }
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <div>
-          <h1>Project Chronicle</h1>
+          <h1 className="text-2xl font-bold mb-4 text-white">Project Chronicle</h1>
         </div>
         
         {user ? (
           <>
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
-              <p>Welcome, {user.email}</p>
+              <div>
+                <p className="text-l font-bold mb-4 text-white">Welcome, {user.email}</p>
+                <StreakDisplay count={streak} />
+              </div>
               <div className="flex gap-4">
+                <button onClick={() => setIsGoalManagerOpen(true)} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white">
+                  Manage Goals
+                </button>
                 <button onClick={() => setIsProfileOpen(true)} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">
                     Profile
                   </button>
@@ -262,18 +414,72 @@ export default function Home() {
               </div>
             </div>
             {
+              isGoalManagerOpen && (
+                <GoalManager
+                  goals={goals}
+                  onSave={handleSaveGoal}
+                  onDelete={handleDeleteGoal}
+                  onClose={() => setIsGoalManagerOpen(false)}
+                />
+              )
+            }
+            {
               isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
             }
-            <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
-              <div className="w-full max-w-2xl mb-8">
-                <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
-                <input
-                  type="text"
-                  placeholder="What is your main goal for today?"
-                  className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg text-blue-50"
-                  value={dailyFocus}
-                  onChange={(e) => setDailyFocus(e.target.value)}
+            {
+              isReflectionOpen && (
+                <DailyReflection
+                  initialReflection={reflectionText}
+                  isDrafting={isDraftingAI}
+                  onSave={handleSaveReflection}
+                  onDraft={handleDraftReflection}
+                  onClose={() => setIsReflectionOpen(false)}
                 />
+              )
+            }
+            <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
+              <div className="w-full max-w-2xl mb-8 mx-auto">
+                <h2 className="text-2xl font-bold mb-4 text-white">Daily Focus</h2>
+                <div className="bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-700">
+                  <div>
+                    <label htmlFor="goal-select" className="block text-sm font-bold mb-2 text-gray-300">
+                      Which goal are you focusing on today?
+                    </label>
+                    <select
+                      id="goal-select"
+                      value={selectedFocusGoalId || ''}
+                      onChange={(e) => setSelectedFocusGoalId(e.target.value)}
+                    >
+                      <option value="" disabled>-- Select a Goal --</option>
+                      {goals.map(goal => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="mission-input" className="block text-sm font-bold mb-2 text-gray-300">
+                      What is your specific mission? (Optional)
+                    </label>
+                    <input
+                      id="mission-input"
+                      type="text"
+                      placeholder="E.g., Complete the first draft of the landing page."
+                      className="w-full p-3 rounded-md text-lg"
+                      value={dailyMission}
+                      onChange={(e) => setDailyMission(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="w-full max-w-2xl mb-8 mx-auto text-center">
+                <button 
+                    onClick={() => setIsReflectionOpen(true)}
+                    className="bg-green-600 hover:bg-green-700 p-3 rounded-md font-bold text-lg"
+                >
+                    End Day & Reflect
+                </button>
               </div>
               <div>
                 <div className="text-center mb-8">
@@ -327,7 +533,7 @@ export default function Home() {
               <div>
                 <div className="w-full max-w-2xl mb-8">
                   <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-                  <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
+                  <form onSubmit={handleSubmit} className="bg-gray-800/50 p-4 rounded-lg flex flex-col gap-4 border border-gray-700">
                     <input
                       type="text"
                       placeholder="Task Name"
