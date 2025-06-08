@@ -28,7 +28,8 @@ export default function Home() {
   const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
 
   // Time
-  const [dailyFocus, setDailyFocus] = useState('');
+  const [selectedFocusGoalId, setSelectedFocusGoalId] = useState<string | null>(null);
+  const [dailyMission, setDailyMission] = useState('');
   const [focusDuration, setFocusDuration] = useState(25);
   const [breakDuration, setBreakDuration] = useState(5);
   const [isActive, setIsActive] = useState(false);
@@ -125,42 +126,48 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!user){
-      setDailyFocus('');
+    if (!user) {
+      setSelectedFocusGoalId(null);
+      setDailyMission('');
       return;
-    };
+    }
 
     const getInitialFocus = async () => {
       const today = getTodayDateString();
       const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
       const docSnap = await getDoc(focusDocRef);
 
-      if (docSnap.exists) {
-        setDailyFocus(docSnap.data().text);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSelectedFocusGoalId(data.goalId || null);
+        setDailyMission(data.mission || '');
       }
-    }
+    };
 
     getInitialFocus();
   }, [user]);
 
   useEffect(() => {
-    // Don't save if there's no user or if the focus field is empty initially.
-    if (!user || dailyFocus === '') {
+    if (!user || !selectedFocusGoalId) {
       return;
     }
-    
-    // Debounce the save operation.
+
     const handler = setTimeout(() => {
       const today = getTodayDateString();
       const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
-      setDoc(focusDocRef, { text: dailyFocus });
-    }, 1000); // Saves 1 second after the user stops typing.
+      const selectedGoal = goals.find(g => g.id === selectedFocusGoalId);
 
-    // Cleanup the timeout if the component unmounts or the effect re-runs.
+      setDoc(focusDocRef, { 
+        goalId: selectedFocusGoalId,
+        goalName: selectedGoal?.name || '', // Store the name for convenience
+        mission: dailyMission 
+      });
+    }, 1000); // Debounced save
+
     return () => {
       clearTimeout(handler);
     };
-  }, [dailyFocus, user]);
+  }, [selectedFocusGoalId, dailyMission, user, goals]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
@@ -330,13 +337,39 @@ export default function Home() {
             <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
               <div className="w-full max-w-2xl mb-8">
                 <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
-                <input
-                  type="text"
-                  placeholder="What is your main goal for today?"
-                  className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg text-blue-50"
-                  value={dailyFocus}
-                  onChange={(e) => setDailyFocus(e.target.value)}
-                />
+                <div className="bg-white/10 p-4 rounded-lg space-y-4">
+                  <div>
+                    <label htmlFor="goal-select" className="block text-sm font-bold mb-2 text-gray-300">
+                      Which goal are you focusing on today?
+                    </label>
+                    <select
+                      id="goal-select"
+                      value={selectedFocusGoalId || ''}
+                      onChange={(e) => setSelectedFocusGoalId(e.target.value)}
+                      className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg"
+                    >
+                      <option value="" disabled>-- Select a Goal --</option>
+                      {goals.map(goal => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="mission-input" className="block text-sm font-bold mb-2 text-gray-300">
+                      What is your specific mission? (Optional)
+                    </label>
+                    <input
+                      id="mission-input"
+                      type="text"
+                      placeholder="E.g., Complete the first draft of the landing page."
+                      className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg"
+                      value={dailyMission}
+                      onChange={(e) => setDailyMission(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
               <div>
                 <div className="text-center mb-8">
