@@ -29,6 +29,7 @@ export default function Home() {
   const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [topStreaks, setTopStreaks] = useState<number[]>([]);
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -178,9 +179,12 @@ export default function Home() {
         const statsDocRef = doc(db, 'users', currentUser.uid, 'stats', 'user_stats');
           statsUnsubscribe = onSnapshot(statsDocRef, (doc) => {
             if (doc.exists()) {
+              const data = doc.data();
               setStreak(doc.data().reflectionStreak || 0);
+              setTopStreaks(data.topStreaks || []);
             } else {
               setStreak(0);
+              setTopStreaks([]);
             }
           }
         );
@@ -190,6 +194,7 @@ export default function Home() {
         setGoals([]);
         setReflectionText('');
         setStreak(0);
+        setTopStreaks([]);
         if (tasksUnsubscribe) tasksUnsubscribe();
         if (goalsUnsubscribe) goalsUnsubscribe();
         if (reflectionUnsubscribe) reflectionUnsubscribe();
@@ -213,26 +218,36 @@ export default function Home() {
 
     const statsDoc = await getDoc(statsDocRef);
     let currentStreak = 0;
+    let lastDate = '';
+    let currentTopStreaks: number[] = [];
     
     if (statsDoc.exists()) {
       const data = statsDoc.data();
-      const lastReflectionDate = data.lastReflectionDate;
+      lastDate = data.lastReflectionDate;
       currentStreak = data.reflectionStreak || 0;
+      currentTopStreaks = data.topStreaks || [];
+    }
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-      
-      if (lastReflectionDate === yesterdayStr) {
-        // Maintained the streak
-        currentStreak++;
-      } else if (lastReflectionDate !== todayStr) {
-        // Missed a day, reset streak
-        currentStreak = 1;
-      }
-      // If lastReflectionDate is today, streak doesn't change.
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if(lastDate === todayStr){
+      // Already reflected today, do nothing to streak
+    } else if (lastDate === yesterdayStr) {
+      // Maintained the streak
+      currentStreak++;
     } else {
-      // First reflection ever
+      // --- Streak is BROKEN ---
+      // Check if the broken streak should be added to the leaderboard
+      if (currentStreak > 0) {
+        currentTopStreaks.push(currentStreak);
+        // Sort descending and keep only the top 5
+        currentTopStreaks.sort((a, b) => b - a);
+        if (currentTopStreaks.length > 5) {
+            currentTopStreaks = currentTopStreaks.slice(0, 5);
+        }
+      }
+      // Missed a day, reset streak
       currentStreak = 1;
     }
     const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', todayStr);
@@ -244,7 +259,8 @@ export default function Home() {
     );
     await setDoc(statsDocRef, { 
         reflectionStreak: currentStreak, 
-        lastReflectionDate: todayStr 
+        lastReflectionDate: todayStr,
+        topStreaks: currentTopStreaks
       }, {
         merge: true
       }
@@ -536,7 +552,14 @@ export default function Home() {
               )
             }
             {
-              isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
+              isProfileOpen && user && (
+                <UserProfile
+                  user={user}
+                  topStreaks={topStreaks}
+                  onClose={
+                    () => setIsProfileOpen(false)} 
+                />
+              )
             }
             {
               isReflectionOpen && (
