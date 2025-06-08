@@ -7,6 +7,8 @@ import TaskItem from "@/components/TaskItem";
 import UserProfile from "@/components/UserProfile";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
+import StreakDisplay from "@/components/StreakDisplay";
+
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -26,6 +28,7 @@ export default function Home() {
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
+  const [streak, setStreak] = useState(0);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -253,7 +256,10 @@ export default function Home() {
         {user ? (
           <>
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
-              <p>Welcome, {user.email}</p>
+              <div>
+                <p>Welcome, {user.email}</p>
+                <StreakDisplay count={streak} />
+              </div>
               <div className="flex gap-4">
                 <button onClick={() => setIsProfileOpen(true)} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">
                     Profile
