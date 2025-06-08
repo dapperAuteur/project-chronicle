@@ -1,5 +1,6 @@
 'use client';
 
+import { FirebaseError } from "firebase/app";
 import { useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { 
@@ -16,8 +17,12 @@ export default function Auth() {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       setError(null);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
     }
   };
 
@@ -25,8 +30,12 @@ export default function Auth() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       setError(null);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unexpected error occurred.');
+      }
     }
   };
 
