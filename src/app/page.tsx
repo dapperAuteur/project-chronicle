@@ -1,7 +1,8 @@
 "use client"
 import { useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from '@/lib/firebase';
+import { collection, doc, onSnapshot, query } from "firebase/firestore";
+import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
@@ -28,14 +29,45 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    // This will hold the function to unsubscribe from the listener
+    let unsubscribe: (() => void) | undefined;
+
+    const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
+      // If a user is logged in, set up the tasks listener
+      if (currentUser) {
+        // Point to the 'tasks' collection for the logged-in user
+        const tasksCollection = collection(db, 'users', currentUser.uid, 'tasks');
+        const q = query(tasksCollection);
+
+        // onSnapshot listens for real-time updates
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const tasksData = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Task[];
+          setTasks(tasksData);
+        });
+      } else {
+        // If user is logged out, clear their tasks
+        setTasks([]);
+        // If there was a listener, unsubscribe from it
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      }
     });
 
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, []);
+    // Cleanup both subscriptions on unmount
+    return () => {
+      authUnsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []); // This effect should still only run once
 
   const handleSignOut = async () => {
     try {
@@ -45,24 +77,24 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    const storedFocus = localStorage.getItem('dailyFocus');
-    if (storedFocus) {
-      setDailyFocus(JSON.parse(storedFocus));
-    }
-    const storedTasks = localStorage.getItem('tasks');
-    if (storedTasks) {
-      setTasks(JSON.parse(storedTasks));
-    }
-  }, []); // An empty dependency array means this effect runs only one time.
+  // useEffect(() => {
+  //   const storedFocus = localStorage.getItem('dailyFocus');
+  //   if (storedFocus) {
+  //     setDailyFocus(JSON.parse(storedFocus));
+  //   }
+  //   const storedTasks = localStorage.getItem('tasks');
+  //   if (storedTasks) {
+  //     setTasks(JSON.parse(storedTasks));
+  //   }
+  // }, []); // An empty dependency array means this effect runs only one time.
 
-  useEffect(() => {
-    // localStorage can only store strings, so we convert the array to a JSON string.
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
-  useEffect(() => {
-    localStorage.setItem('dailyFocus', JSON.stringify(dailyFocus));
-  }, [dailyFocus]);
+  // useEffect(() => {
+  //   // localStorage can only store strings, so we convert the array to a JSON string.
+  //   localStorage.setItem('tasks', JSON.stringify(tasks));
+  // }, [tasks]);
+  // useEffect(() => {
+  //   localStorage.setItem('dailyFocus', JSON.stringify(dailyFocus));
+  // }, [dailyFocus]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined = undefined;
