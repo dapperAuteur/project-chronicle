@@ -1,5 +1,6 @@
 // src/components/TaskItem.tsx
 import { Task } from '@/types/task';
+import { MouseEvent } from 'react';
 
 interface TaskItemProps {
   task: Task;
@@ -10,6 +11,8 @@ interface TaskItemProps {
   onToggleStatus: (id: string) => void;
   onEdit: (id: string) => void;
   onAdjustPomodoros: (id: string, amount: number) => void;
+  onAddSubtask: (parentId: string) => void;
+  level: number;
 }
 
 // Notice how we're using the interface to type the props
@@ -21,12 +24,25 @@ export default function TaskItem({
   onDelete,
   onToggleStatus,
   onEdit,
-  onAdjustPomodoros
+  onAdjustPomodoros,
+  onAddSubtask,
+  level,
 }: TaskItemProps) {
   const containerClasses = `
-    bg-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer
+    bg-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer transition-colors
     ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-white/20'}
   `;
+
+  const handleButtonClick = (e: MouseEvent, action: (id: string) => void) => {
+    e.stopPropagation();
+    action(task.id);
+  };
+
+  const handleAdjustPomosClick = (e: MouseEvent, amount: number) => {
+    e.stopPropagation();
+    if (amount === -1 && task.pomodorosCompleted <= 0) return;
+    onAdjustPomodoros(task.id, amount);
+  }
 
   const handleIncreasePomos = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,52 +70,36 @@ export default function TaskItem({
   return (
     <div
       className={containerClasses}
-      onClick={() => onClick(task.id)}>
-      <div className="flex items-center gap-4">
+      onClick={() => onClick(task.id)}
+      style={{ marginLeft: `${level * 2}rem` }} // NEW: Apply indentation based on level
+    >
+      <div className="flex items-center gap-2 flex-grow">
         <input
           type="checkbox"
           checked={task.status === 'Done'}
-          // onChange={handleToggleClick} // We'll reuse the click handler logic
-          onChange={handleToggleChange}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          onChange={(e) => handleButtonClick(e, onToggleStatus)}
+          className="w-5 h-5 rounded accent-blue-500 flex-shrink-0"
         />
-        <div className="flex items-center gap-2"> {/* Wrapper for buttons */}
-          <button 
-            onClick={handleEditClick} // Add handler
-            className="text-blue-500 hover:text-blue-400"
-            aria-label={`Edit task ${task.name}`}
-          >
-            ✏️ {/* Pencil emoji */}
-          </button>
-          <button 
-            onClick={handleDeleteClick}
-            className="text-red-500 hover:text-red-400"
-            aria-label={`Delete task ${task.name}`}
-          >
-            🗑️ {/* Simple trash can emoji for now */}
-          </button>
-        </div>
-        <div>
-          <h3 className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
+        <div className="flex-grow">
+          <p className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
             {task.name}
-          </h3>
-          {task.notes && (
-            <p className="text-sm text-gray-400 mt-1 italic">&quot;{task.notes}&quot;</p>
-            )
-          }
-          <p className="text-sm text-gray-400">{task.category}</p>
+          </p>
+          {task.notes && <p className="text-xs text-gray-400 italic">"{task.notes}"</p>}
         </div>
       </div>
-      <div className="text-right">
-        {isSelected && isActive && (
-           <span className="text-xs text-blue-400 mr-2">Running</span>
-        )}
-        <div className="flex items-center justify-end gap-2">
-          <button onClick={handleDecreasePomos} className="text-lg font-bold w-6 h-6 rounded-full bg-white/10 hover:bg-white/20">-</button>
-          <p className="font-semibold w-20 text-center">{task.pomodorosCompleted} Pomodoros</p>
-          <button onClick={handleIncreasePomos} className="text-lg font-bold w-6 h-6 rounded-full bg-white/10 hover:bg-white/20">+</button>
+
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        {/* NEW: Add Sub-task Button */}
+        <button onClick={(e) => handleButtonClick(e, onAddSubtask)} className="p-1 rounded hover:bg-white/20 text-lg" aria-label="Add sub-task">＋</button>
+        
+        <div className="flex items-center gap-1">
+          <button onClick={(e) => handleAdjustPomosClick(e, -1)} className="text-sm font-bold w-5 h-5 rounded-full bg-white/10 hover:bg-white/20">-</button>
+          <span className="text-xs w-8 text-center">{task.pomodorosCompleted}</span>
+          <button onClick={(e) => handleAdjustPomosClick(e, 1)} className="text-sm font-bold w-5 h-5 rounded-full bg-white/10 hover:bg-white/20">+</button>
         </div>
-        <span className="text-xs px-2 py-1 bg-gray-600 rounded-full mt-2 inline-block">{task.priority}</span>
+        
+        <button onClick={(e) => handleButtonClick(e, onEdit)} className="p-1 rounded hover:bg-white/20" aria-label="Edit task">✏️</button>
+        <button onClick={(e) => handleButtonClick(e, onDelete)} className="p-1 rounded hover:bg-white/20" aria-label="Delete task">🗑️</button>
       </div>
     </div>
   );

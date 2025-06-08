@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
@@ -30,6 +30,7 @@ export default function Home() {
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
   const [streak, setStreak] = useState(0);
   const [topStreaks, setTopStreaks] = useState<number[]>([]);
+  const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -100,7 +101,66 @@ export default function Home() {
     setTaskPriority('Medium');
     setTaskNotes('');
     setEditingTaskId(null);
+    setSubtaskParentId(null);
     categoryManuallySet.current = false; // Reset for the next new task
+  };
+
+  const handleAddSubtask = (parentId: string) => {
+    setSubtaskParentId(parentId); // Set the parent ID
+    setEditingTaskId(null); // Ensure we are not in edit mode
+    // Optional: focus the task name input field
+    document.getElementById('task-name-input')?.focus();
+  };
+
+  const taskTree = useMemo(() => {
+    const tree: (Task & { children: Task[] })[] = [];
+    const childrenOf: { [key: string]: (Task & { children: Task[] })[] } = {};
+
+    tasks.forEach(task => {
+      const newTask = { ...task, children: [] };
+      if (task.parentId) {
+        childrenOf[task.parentId] = childrenOf[task.parentId] || [];
+        childrenOf[task.parentId].push(newTask);
+      } else {
+        tree.push(newTask);
+      }
+    });
+
+    tasks.forEach(task => {
+      if (childrenOf[task.id]) {
+        const taskInTree = tree.find(t => t.id === task.id) || 
+                           Object.values(childrenOf).flat().find(t => t.id === task.id);
+        if (taskInTree) {
+          taskInTree.children = childrenOf[task.id];
+        }
+      }
+    });
+    
+    return tree;
+  }, [tasks]);
+
+  const renderTasks = (tasksToRender: (Task & { children: Task[] })[], level: number) => {
+    return tasksToRender.map(task => (
+      <div key={task.id}>
+        <TaskItem
+          task={task}
+          isSelected={task.id === selectedTaskId}
+          isActive={isActive && selectedTaskId === task.id}
+          onToggleStatus={handleToggleStatus}
+          onDelete={handleDeleteTask}
+          onEdit={handleStartEditing}
+          onAdjustPomodoros={handleAdjustPomodoros}
+          onClick={setSelectedTaskId}
+          onAddSubtask={handleAddSubtask}
+          level={level}
+        />
+        {task.children && task.children.length > 0 && (
+          <div className="border-l-2 border-gray-700/50">
+             {renderTasks(task.children, level + 1)}
+          </div>
+        )}
+      </div>
+    ));
   };
 
   useEffect(() => {
@@ -484,6 +544,8 @@ export default function Home() {
 
     if (!taskName.trim() || !user) return;
 
+    const now = new Date().toISOString;
+
     if (editingTaskId) {
       const taskDocRef = doc(db, 'users', user.uid, 'tasks', editingTaskId);
       await updateDoc(taskDocRef, {
@@ -491,7 +553,7 @@ export default function Home() {
         category: taskCategory,
         priority: taskPriority,
         notes: taskNotes,
-        updatedAt: new Date().toISOString().slice(0, 10),
+        updatedAt: now,
       });
       setEditingTaskId(null);
     } else {
@@ -502,9 +564,9 @@ export default function Home() {
         priority: taskPriority,
         status: 'To Do',
         pomodorosCompleted: 0,
-        notes: taskNotes,
-        createdAt: new Date().toISOString().slice(0, 10),
-        updatedAt: new Date().toISOString().slice(0, 10),
+        createdAt: now,
+        updatedAt: now,
+        parentId: subtaskParentId,
       });
     }
     resetFormState();
@@ -670,6 +732,7 @@ export default function Home() {
                   <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
                   <form onSubmit={handleSubmit} className="bg-gray-800/50 p-4 rounded-lg flex flex-col gap-4 border border-gray-700">
                     <input
+                      id="task-name-input"
                       type="text"
                       placeholder="Task Name"
                       className="bg-gray-800 p-2 rounded-md border border-gray-700 text-amber-50"
@@ -707,40 +770,36 @@ export default function Home() {
                     {editingTaskId && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setEditingTaskId(null);
-                          setTaskName('');
-                          setTaskCategory('');
-                          setTaskPriority('Medium');
-                          setTaskNotes('');
-                        }}
+                        onClick={() => {resetFormState}}
                         className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
                       >
                         Cancel
                       </button>
                       )
                     }
+                    {
+                      subtaskParentId && !editingTaskId && (
+                        <div className="text-sm text-amber-400 p-2 bg-amber-900/50 rounded-md">
+                          Adding sub-task to: "{tasks.find(t => t.id === subtaskParentId)?.name}"
+                          <button
+                            type="button"
+                            onClick={() => setSubtaskParentId(null)}
+                            className="ml-2 text-red-400 font-bold"
+                            >[Cancel]
+                          </button>
+                        </div>
+                      )
+                    }
                   </form>
                 </div>
               </div>
               <div>
-                <div className="w-full max-w-2xl">
+                <div className="w-full">
                   <h2 className="text-2xl font-bold mb-4">Today&apos;s Tasks</h2>
                   <div className="space-y-4">
-                    {/* Render the tasks using your new component */}
-                    {tasks.map(task => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        isSelected={task.id === selectedTaskId}
-                        isActive={isActive}
-                        onClick={setSelectedTaskId}
-                        onDelete={handleDeleteTask}
-                        onToggleStatus={handleToggleStatus}
-                        onEdit={handleStartEditing}
-                        onAdjustPomodoros={handleAdjustPomodoros}
-                      />
-                    ))}
+                    <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                      {renderTasks(taskTree, 0)}
+                    </div>
                   </div>
                 </div>
               </div>

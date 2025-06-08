@@ -7,6 +7,7 @@ export interface Task {
   dueDate?: string;
   pomodorosCompleted: number;
   notes?: string;
+  parentId: string | null;
   createdAt: string;
   updatedAt: string;
 }
