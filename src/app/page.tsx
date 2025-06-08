@@ -1,12 +1,13 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, orderBy } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import UserProfile from "@/components/UserProfile";
 import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
+import { Milestone } from "@/types/milestone";
 import Auth from "@/components/Auth";
 import GoalManager from "@/components/GoalManager";
 import DailyReflection from '@/components/DailyReflection';
@@ -33,6 +34,8 @@ export default function Home() {
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
   const [collapsedTasks, setCollapsedTasks] = useState<string[]>([]);
   const [taskDeadline, setTaskDeadline] = useState('');
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
+  const [currentMilestones, setCurrentMilestones] = useState<Milestone[]>([]);
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -207,7 +210,7 @@ export default function Home() {
     return () => unsubscribe();
   }, [user]);
 
-  const handleSaveGoal = async (goalName: string, deadline: string, goalId?: string) => {
+  const handleGoalSave = async (goalName: string, deadline: string, goalId?: string) => {
     if (!user) return;
     const goalsCollectionRef = collection(db, 'users', user.uid, 'goals');
 
@@ -413,6 +416,50 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    let milestoneUnsubscribe: (() => void) | undefined;
+    
+    if (user && expandedGoalId) {
+      const milestonesCollection = collection(db, 'users', user.uid, 'goals', expandedGoalId, 'milestones');
+      const q = query(milestonesCollection, orderBy('deadline', 'asc')); // Order by deadline
+      
+      milestoneUnsubscribe = onSnapshot(q, (snapshot) => {
+        setCurrentMilestones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Milestone[]);
+      });
+    } else {
+      setCurrentMilestones([]); // Clear milestones if no goal is expanded
+    }
+
+    return () => {
+      if (milestoneUnsubscribe) milestoneUnsubscribe();
+    };
+  }, [user, expandedGoalId]);
+
+  const handleSaveMilestone = async (name: string, deadline: string, goalId: string) => {
+    if (!user) return;
+    const milestonesCollectionRef = collection(db, 'users', user.uid, 'goals', goalId, 'milestones');
+    await addDoc(milestonesCollectionRef, {
+      name,
+      deadline: deadline || null,
+      status: 'To Do',
+      goalId,
+    });
+  };
+
+  const handleToggleMilestoneStatus = async (milestoneId: string, currentStatus: 'To Do' | 'Complete') => {
+    if (!user || !expandedGoalId) return;
+    const milestoneDocRef = doc(db, 'users', user.uid, 'goals', expandedGoalId, 'milestones', milestoneId);
+    await updateDoc(milestoneDocRef, { status: currentStatus === 'To Do' ? 'Complete' : 'To Do' });
+  };
+  
+  const handleDeleteMilestone = async (milestoneId: string) => {
+    if (!user || !expandedGoalId) return;
+    if (window.confirm("Are you sure you want to delete this milestone?")) {
+        const milestoneDocRef = doc(db, 'users', user.uid, 'goals', expandedGoalId, 'milestones', milestoneId);
+        await deleteDoc(milestoneDocRef);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut(auth);
@@ -571,7 +618,7 @@ export default function Home() {
 
     if (!taskName.trim() || !user) return;
 
-    const now = new Date().toISOString;
+    const now = new Date().toISOString();
 
     const taskData = {
       name: taskName,
@@ -634,9 +681,18 @@ export default function Home() {
               isGoalManagerOpen && (
                 <GoalManager
                   goals={goals}
-                  onSave={handleSaveGoal}
-                  onDelete={handleDeleteGoal}
-                  onClose={() => setIsGoalManagerOpen(false)}
+                  activeGoalMilestones={currentMilestones}
+                  expandedGoalId={expandedGoalId}
+                  onGoalSave={handleGoalSave}
+                  onGoalDelete={handleDeleteGoal}
+                  onMilestoneSave={handleSaveMilestone}
+                  onMilestoneToggle={handleToggleMilestoneStatus}
+                  onMilestoneDelete={handleDeleteMilestone}
+                  onExpandGoal={setExpandedGoalId}
+                  onClose={() => {
+                    setIsGoalManagerOpen(false);
+                    setExpandedGoalId(null);
+                  }}
                 />
               )
             }
