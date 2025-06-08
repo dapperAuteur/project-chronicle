@@ -10,6 +10,7 @@ import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
 import GoalManager from "@/components/GoalManager";
 import DailyReflection from '@/components/DailyReflection';
+import StreakDisplay from "@/components/StreakDisplay";
 
 const categoryKeywords: { [key: string]: string[] } = {
   'Work': ['project', 'report', 'meeting', 'presentation', 'deadline'],
@@ -27,6 +28,7 @@ export default function Home() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+  const [streak, setStreak] = useState(0);
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -138,10 +140,12 @@ export default function Home() {
     await deleteDoc(goalDocRef);
   };
 
+  // Main Data Loading useEffect
   useEffect(() => {
     let tasksUnsubscribe: (() => void) | undefined;
     let goalsUnsubscribe: (() => void) | undefined;
     let reflectionUnsubscribe: (() => void) | undefined;
+    let statsUnsubscribe: (() => void) | undefined;
 
     const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -170,14 +174,26 @@ export default function Home() {
             setReflectionText('');
           }
         });
+
+        const statsDocRef = doc(db, 'users', currentUser.uid, 'stats', 'user_stats');
+          statsUnsubscribe = onSnapshot(statsDocRef, (doc) => {
+            if (doc.exists()) {
+              setStreak(doc.data().reflectionStreak || 0);
+            } else {
+              setStreak(0);
+            }
+          }
+        );
       } else {
         // Clear all data on logout
         setTasks([]);
         setGoals([]);
         setReflectionText('');
+        setStreak(0);
         if (tasksUnsubscribe) tasksUnsubscribe();
         if (goalsUnsubscribe) goalsUnsubscribe();
         if (reflectionUnsubscribe) reflectionUnsubscribe();
+        if (statsUnsubscribe) statsUnsubscribe();
       }
     });
 
@@ -186,14 +202,53 @@ export default function Home() {
       if (tasksUnsubscribe) tasksUnsubscribe();
       if (goalsUnsubscribe) goalsUnsubscribe();
       if (reflectionUnsubscribe) reflectionUnsubscribe();
+      if (statsUnsubscribe) statsUnsubscribe();
     };
   }, []);
 
   const handleSaveReflection = async (newReflectionText: string) => {
     if (!user) return;
-    const today = getTodayDateString();
-    const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', today);
-    await setDoc(reflectionDocRef, { text: newReflectionText, date: today }, { merge: true });
+    const todayStr = getTodayDateString();
+    const statsDocRef = doc(db, 'users', user.uid, 'stats', 'user_stats');
+
+    const statsDoc = await getDoc(statsDocRef);
+    let currentStreak = 0;
+    
+    if (statsDoc.exists()) {
+      const data = statsDoc.data();
+      const lastReflectionDate = data.lastReflectionDate;
+      currentStreak = data.reflectionStreak || 0;
+
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      
+      if (lastReflectionDate === yesterdayStr) {
+        // Maintained the streak
+        currentStreak++;
+      } else if (lastReflectionDate !== todayStr) {
+        // Missed a day, reset streak
+        currentStreak = 1;
+      }
+      // If lastReflectionDate is today, streak doesn't change.
+    } else {
+      // First reflection ever
+      currentStreak = 1;
+    }
+    const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', todayStr);
+    await setDoc(reflectionDocRef, {
+      text: newReflectionText, date: todayStr
+      }, {
+        merge: true
+      }
+    );
+    await setDoc(statsDocRef, { 
+        reflectionStreak: currentStreak, 
+        lastReflectionDate: todayStr 
+      }, {
+        merge: true
+      }
+    );
     setReflectionText(newReflectionText); // Update local state immediately
   };
 
@@ -458,6 +513,7 @@ export default function Home() {
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
               <div>
                 <p className="text-l font-bold mb-4 text-white">Welcome, {user.email}</p>
+                <StreakDisplay count={streak} />
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setIsGoalManagerOpen(true)} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white">
