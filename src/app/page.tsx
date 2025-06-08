@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import TaskItem from "@/components/TaskItem";
 import { Task } from "@/types/task";
+import Auth from "@/components/Auth";
 
 // const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
 // const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
@@ -165,7 +166,9 @@ export default function Home() {
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <div>
           <h1>Project Chronicle</h1>
-        </div>        
+        </div>
+        <Auth />
+        <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
         <div className="w-full max-w-2xl mb-8">
           <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
           <input

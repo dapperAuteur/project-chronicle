@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: "project-chronicle"
+location: "us-central1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fdcdb"
+      cloudSql:
+        instanceId: "project-chronicle-fdc"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]
