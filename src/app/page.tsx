@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
@@ -11,6 +11,14 @@ import Auth from "@/components/Auth";
 import GoalManager from "@/components/GoalManager";
 import DailyReflection from '@/components/DailyReflection';
 
+const categoryKeywords: { [key: string]: string[] } = {
+  'Work': ['project', 'report', 'meeting', 'presentation', 'deadline'],
+  'Learning': ['learn', 'study', 'read', 'course', 'tutorial'],
+  'Communication': ['call', 'email', 'message', 'chat', 'contact'],
+  'Health': ['workout', 'gym', 'run', 'meditate', 'doctor'],
+  'Personal': ['errand', 'buy', 'shop', 'clean', 'organize'],
+  'Design': ['design', 'mockup', 'figma', 'prototype', 'sketch'],
+};
 
 export default function Home() {
   // Component State
@@ -53,6 +61,43 @@ export default function Home() {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const categoryManuallySet = useRef(false);
+
+  useEffect(() => {
+    // If the user has already typed in the category box, don't override them.
+    if (categoryManuallySet.current) {
+      return;
+    }
+
+    const lowerCaseTaskName = taskName.toLowerCase();
+
+    // Find the first category that has a keyword matching the task name
+    const suggestedCategory = Object.keys(categoryKeywords).find(category =>
+      categoryKeywords[category].some(keyword => lowerCaseTaskName.includes(keyword))
+    );
+
+    if (suggestedCategory) {
+      setTaskCategory(suggestedCategory);
+    }
+    // If no keyword matches, we don't change the category
+    
+  }, [taskName]);
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    categoryManuallySet.current = true; // Mark as manually changed
+    setTaskCategory(e.target.value);
+  };
+
+  // NEW: When the form is submitted, reset the manual override flag
+  const resetFormState = () => {
+    setTaskName('');
+    setTaskCategory('');
+    setTaskPriority('Medium');
+    setTaskNotes('');
+    setEditingTaskId(null);
+    categoryManuallySet.current = false; // Reset for the next new task
   };
 
   useEffect(() => {
@@ -391,10 +436,7 @@ export default function Home() {
         updatedAt: new Date().toISOString().slice(0, 10),
       });
     }
-    setTaskName('');
-    setTaskCategory('');
-    setTaskPriority('Medium');
-    setTaskNotes('');
+    resetFormState();
   };
 
   const minutes = Math.floor(timeRemaining / 60);
@@ -560,7 +602,7 @@ export default function Home() {
                       placeholder="Category"
                       className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
                       value={taskCategory}
-                      onChange={(e) => setTaskCategory(e.target.value)}
+                      onChange={handleCategoryChange}
                     />
                     <select
                     className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
