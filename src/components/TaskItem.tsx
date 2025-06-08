@@ -21,7 +21,7 @@ interface TaskItemProps {
 export default function TaskItem({
   task,
   isSelected,
-  isActive,
+  // isActive,
   isCollapsed,
   hasChildren,
   onClick,
@@ -49,29 +49,29 @@ export default function TaskItem({
     onAdjustPomodoros(task.id, amount);
   }
 
-  const handleIncreasePomos = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onAdjustPomodoros(task.id, 1);
-  };
+  // const handleIncreasePomos = (e: React.MouseEvent) => {
+  //   e.stopPropagation();
+  //   onAdjustPomodoros(task.id, 1);
+  // };
 
-  const handleDecreasePomos = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Prevent going below zero
-    if (task.pomodorosCompleted > 0) {
-      onAdjustPomodoros(task.id, -1);
-    }
-  };
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onEdit(task.id);
-  };
-  const handleToggleChange = () => {
-    onToggleStatus(task.id);
-  };
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Stop the click from bubbling up to the parent div
-    onDelete(task.id);
-  };
+  // const handleDecreasePomos = (e: React.MouseEvent) => {
+  //   e.stopPropagation();
+  //   // Prevent going below zero
+  //   if (task.pomodorosCompleted > 0) {
+  //     onAdjustPomodoros(task.id, -1);
+  //   }
+  // };
+  // const handleEditClick = (e: React.MouseEvent) => {
+  //   e.stopPropagation();
+  //   onEdit(task.id);
+  // };
+  // const handleToggleChange = () => {
+  //   onToggleStatus(task.id);
+  // };
+  // const handleDeleteClick = (e: React.MouseEvent) => {
+  //   e.stopPropagation(); // Stop the click from bubbling up to the parent div
+  //   onDelete(task.id);
+  // };
 
   const getDeadlineInfo = () => {
     if (!task.deadline) return null;
@@ -134,7 +134,7 @@ export default function TaskItem({
               {deadlineInfo.text}
             </span>
           )}
-          {task.notes && <p className="text-xs text-gray-400 italic truncate">"{task.notes}"</p>}
+          {task.notes && <p className="text-xs text-gray-400 italic truncate">&quot;{task.notes}&quot;</p>}
         </div>
       </div>
 

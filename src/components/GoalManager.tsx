@@ -41,7 +41,7 @@ export default function GoalManager({
   goals,
   activeGoalMilestones,
   expandedGoalId,
-  onGoalSave,
+  // onGoalSave,
   onGoalDelete,
   onMilestoneSave,
   onMilestoneToggle,
