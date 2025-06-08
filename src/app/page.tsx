@@ -31,6 +31,7 @@ export default function Home() {
   const [streak, setStreak] = useState(0);
   const [topStreaks, setTopStreaks] = useState<number[]>([]);
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
+  const [collapsedTasks, setCollapsedTasks] = useState<string[]>([]);
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -112,6 +113,18 @@ export default function Home() {
     document.getElementById('task-name-input')?.focus();
   };
 
+  const handleToggleCollapse = (taskId: string) => {
+    setCollapsedTasks(prevCollapsed => {
+      if (prevCollapsed.includes(taskId)) {
+        // If it's already collapsed, expand it by removing it from the array
+        return prevCollapsed.filter(id => id !== taskId);
+      } else {
+        // If it's expanded, collapse it by adding it to the array
+        return [...prevCollapsed, taskId];
+      }
+    });
+  };
+
   const taskTree = useMemo(() => {
     const tree: (Task & { children: Task[] })[] = [];
     const childrenOf: { [key: string]: (Task & { children: Task[] })[] } = {};
@@ -140,27 +153,36 @@ export default function Home() {
   }, [tasks]);
 
   const renderTasks = (tasksToRender: (Task & { children: Task[] })[], level: number) => {
-    return tasksToRender.map(task => (
-      <div key={task.id}>
-        <TaskItem
-          task={task}
-          isSelected={task.id === selectedTaskId}
-          isActive={isActive && selectedTaskId === task.id}
-          onToggleStatus={handleToggleStatus}
-          onDelete={handleDeleteTask}
-          onEdit={handleStartEditing}
-          onAdjustPomodoros={handleAdjustPomodoros}
-          onClick={setSelectedTaskId}
-          onAddSubtask={handleAddSubtask}
-          level={level}
-        />
-        {task.children && task.children.length > 0 && (
-          <div className="border-l-2 border-gray-700/50">
-             {renderTasks(task.children, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
+    return tasksToRender.map(task => {
+      const isCollapsed = collapsedTasks.includes(task.id);
+      const hasChildren = task.children && task.children.length > 0;
+      
+      return (
+        <div key={task.id}>
+          <TaskItem
+            task={task}
+            isSelected={task.id === selectedTaskId}
+            isActive={isActive && selectedTaskId === task.id}
+            isCollapsed={isCollapsed}
+            hasChildren={hasChildren}
+            onToggleStatus={handleToggleStatus}
+            onDelete={handleDeleteTask}
+            onEdit={handleStartEditing}
+            onAdjustPomodoros={handleAdjustPomodoros}
+            onClick={setSelectedTaskId}
+            onAddSubtask={handleAddSubtask}
+            onToggleCollapse={handleToggleCollapse}
+            level={level}
+          />
+          {/* NEW: Conditionally render children only if the task is NOT collapsed */}
+          {!isCollapsed && hasChildren && (
+            <div className="border-l-2 border-gray-700/50">
+               {renderTasks(task.children, level + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   useEffect(() => {

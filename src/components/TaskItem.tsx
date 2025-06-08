@@ -6,12 +6,15 @@ interface TaskItemProps {
   task: Task;
   isSelected: boolean;
   isActive: boolean;
+  isCollapsed: boolean;
+  hasChildren: boolean;
   onClick: (id: string) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (id: string) => void;
   onEdit: (id: string) => void;
   onAdjustPomodoros: (id: string, amount: number) => void;
   onAddSubtask: (parentId: string) => void;
+  onToggleCollapse: (id: string) => void;
   level: number;
 }
 
@@ -20,12 +23,15 @@ export default function TaskItem({
   task,
   isSelected,
   isActive,
+  isCollapsed,
+  hasChildren,
   onClick,
   onDelete,
   onToggleStatus,
   onEdit,
   onAdjustPomodoros,
   onAddSubtask,
+  onToggleCollapse,
   level,
 }: TaskItemProps) {
   const containerClasses = `
@@ -73,18 +79,28 @@ export default function TaskItem({
       onClick={() => onClick(task.id)}
       style={{ marginLeft: `${level * 2}rem` }} // NEW: Apply indentation based on level
     >
-      <div className="flex items-center gap-2 flex-grow">
+      <div className="flex items-center gap-2 flex-grow min-w-0">
+        <div className="w-6 flex-shrink-0 text-center">
+          {hasChildren && (
+            <button onClick={(e) => handleButtonClick(e, onToggleCollapse)}
+              className="text-gray-400 hover:text-white text-lg"
+              aria-label={isCollapsed ? 'Expand task' : 'Collapse task'}>
+                {isCollapsed ? '▶' : '▼'}
+            </button>
+            )
+          }
+        </div>
         <input
           type="checkbox"
           checked={task.status === 'Done'}
           onChange={(e) => handleButtonClick(e, onToggleStatus)}
           className="w-5 h-5 rounded accent-blue-500 flex-shrink-0"
         />
-        <div className="flex-grow">
+        <div className="flex-grow truncate">
           <p className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
             {task.name}
           </p>
-          {task.notes && <p className="text-xs text-gray-400 italic">"{task.notes}"</p>}
+          {task.notes && <p className="text-xs text-gray-400 italic truncate">"{task.notes}"</p>}
         </div>
       </div>
 
