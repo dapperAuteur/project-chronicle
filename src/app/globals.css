@@ -1,2 +1,20 @@
 @import "tailwindcss";
+@tailwind utilities;
 
+body {
+  color: #E5E7EB; /* A light gray for body text, less harsh than pure white */
+  background-color: #111827; /* A darker, less saturated gray for the background */
+}
+
+/* Style for all input and select elements for consistency and accessibility */
+input, select, textarea {
+  background-color: #1F2937; /* Darker gray for inputs */
+  border: 1px solid #4B5563; /* Clearer border */
+  color: #F9FAFB; /* Bright text for high contrast */
+}
+
+/* Styling for placeholder text */
+::placeholder {
+  color: #9CA3AF; /* Lighter gray for placeholder text */
+  opacity: 1; /* Override default opacity */
+}
