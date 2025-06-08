@@ -5,9 +5,11 @@ import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDo
 import { auth, db, enableIndexedDbPersistence } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import UserProfile from "@/components/UserProfile";
+import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
 import StreakDisplay from "@/components/StreakDisplay";
+import GoalManager from "@/components/GoalManager";
 
 
 export default function Home() {
@@ -21,6 +23,11 @@ export default function Home() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  // Goals
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
+
+  // Time
   const [dailyFocus, setDailyFocus] = useState('');
   const [focusDuration, setFocusDuration] = useState(25);
   const [breakDuration, setBreakDuration] = useState(5);
@@ -36,6 +43,44 @@ export default function Home() {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  useEffect(() => {
+    if (!user) {
+      setGoals([]);
+      return;
+    }
+
+    const goalsCollection = collection(db, 'users', user.uid, 'goals');
+    const q = query(goalsCollection);
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const goalsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Goal[];
+      setGoals(goalsData);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSaveGoal = async (goalName: string, goalId?: string) => {
+    if (!user) return;
+    const goalsCollectionRef = collection(db, 'users', user.uid, 'goals');
+
+    if (goalId) { // Editing existing goal
+      const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+      await updateDoc(goalDocRef, { name: goalName });
+    } else { // Adding new goal
+      await addDoc(goalsCollectionRef, { name: goalName });
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!user) return;
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await deleteDoc(goalDocRef);
   };
 
   useEffect(() => {
@@ -261,12 +306,24 @@ export default function Home() {
                 <StreakDisplay count={streak} />
               </div>
               <div className="flex gap-4">
+                <button onClick={() => setIsGoalManagerOpen(true)} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white">
+                  Manage Goals
+                </button>
                 <button onClick={() => setIsProfileOpen(true)} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">
                     Profile
                   </button>
                 <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold">Sign Out</button>
               </div>
             </div>
+            {isGoalManagerOpen && (
+              <GoalManager
+                goals={goals}
+                onSave={handleSaveGoal}
+                onDelete={handleDeleteGoal}
+                onClose={() => setIsGoalManagerOpen(false)}
+              />
+              )
+            }
             {
               isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
             }
