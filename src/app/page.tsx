@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db, enableIndexedDbPersistence } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import UserProfile from "@/components/UserProfile";
 import { Goal } from "@/types/goal";
@@ -11,25 +11,33 @@ import Auth from "@/components/Auth";
 import StreakDisplay from "@/components/StreakDisplay";
 import GoalManager from "@/components/GoalManager";
 
+import DailyReflection from '@/components/DailyReflection';
+
 
 export default function Home() {
+  // Component State
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
+  const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+
+  // Data State
   const [tasks, setTasks] = useState<Task[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
+
+  // Daily Focus State
+  const [selectedFocusGoalId, setSelectedFocusGoalId] = useState<string | null>(null);
+  const [dailyMission, setDailyMission] = useState('');
+
+  // Form State
   const [taskName, setTaskName] = useState('');
   const [taskNotes, setTaskNotes] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // Goals
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
-
-  // Time
-  const [selectedFocusGoalId, setSelectedFocusGoalId] = useState<string | null>(null);
-  const [dailyMission, setDailyMission] = useState('');
+  // Timer State
   const [focusDuration, setFocusDuration] = useState(25);
   const [breakDuration, setBreakDuration] = useState(5);
   const [isActive, setIsActive] = useState(false);
@@ -37,6 +45,10 @@ export default function Home() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
   const [streak, setStreak] = useState(0);
+
+  // NEW: Daily Reflection State
+  const [reflectionText, setReflectionText] = useState('');
+  const [isDraftingAI, setIsDraftingAI] = useState(false);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -86,36 +98,75 @@ export default function Home() {
 
   useEffect(() => {
     let tasksUnsubscribe: (() => void) | undefined;
+    let goalsUnsubscribe: (() => void) | undefined;
+    let reflectionUnsubscribe: (() => void) | undefined;
 
     const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
 
       if (currentUser) {
+        // Fetch Tasks
         const tasksCollection = collection(db, 'users', currentUser.uid, 'tasks');
-        const q = query(tasksCollection);
-        tasksUnsubscribe = onSnapshot(q, (querySnapshot) => {
-          const tasksData = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Task[];
-          setTasks(tasksData);
+        tasksUnsubscribe = onSnapshot(query(tasksCollection), (snapshot) => {
+          setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[]);
+        });
+
+        // Fetch Goals
+        const goalsCollection = collection(db, 'users', currentUser.uid, 'goals');
+        goalsUnsubscribe = onSnapshot(query(goalsCollection), (snapshot) => {
+          setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Goal[]);
+        });
+
+        // NEW: Fetch today's reflection
+        const today = getTodayDateString();
+        const reflectionDocRef = doc(db, 'users', currentUser.uid, 'daily_reflection', today);
+        reflectionUnsubscribe = onSnapshot(reflectionDocRef, (doc) => {
+          if (doc.exists()) {
+            setReflectionText(doc.data().text);
+          } else {
+            setReflectionText('');
+          }
         });
       } else {
+        // Clear all data on logout
         setTasks([]);
-        if (tasksUnsubscribe) {
-          tasksUnsubscribe();
-        }
+        setGoals([]);
+        setReflectionText('');
+        if (tasksUnsubscribe) tasksUnsubscribe();
+        if (goalsUnsubscribe) goalsUnsubscribe();
+        if (reflectionUnsubscribe) reflectionUnsubscribe();
       }
     });
 
     return () => {
       authUnsubscribe();
-      if (tasksUnsubscribe) {
-        tasksUnsubscribe();
-      }
+      if (tasksUnsubscribe) tasksUnsubscribe();
+      if (goalsUnsubscribe) goalsUnsubscribe();
+      if (reflectionUnsubscribe) reflectionUnsubscribe();
     };
   }, []);
+
+  const handleSaveReflection = async (newReflectionText: string) => {
+    if (!user) return;
+    const today = getTodayDateString();
+    const reflectionDocRef = doc(db, 'users', user.uid, 'daily_reflection', today);
+    await setDoc(reflectionDocRef, { text: newReflectionText, date: today }, { merge: true });
+    setReflectionText(newReflectionText); // Update local state immediately
+  };
+
+  const handleDraftReflection = async () => {
+    // This is where we will call our AI API in the next step
+    // For now, it just simulates the loading state
+    setIsDraftingAI(true);
+    console.log("Drafting with AI...");
+    // Simulate a network call
+    setTimeout(() => {
+        // In the future, this will be the text from the AI
+        setReflectionText("This is a placeholder summary from the AI."); 
+        setIsDraftingAI(false);
+    }, 2000);
+  };
 
   const handleSignOut = async () => {
     try {
@@ -295,7 +346,7 @@ export default function Home() {
   const seconds = timeRemaining % 60;
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <p className="flex min-h-screen items-center justify-center">Loading...</p>;
   }
 
   return (
@@ -322,17 +373,29 @@ export default function Home() {
                 <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold">Sign Out</button>
               </div>
             </div>
-            {isGoalManagerOpen && (
-              <GoalManager
-                goals={goals}
-                onSave={handleSaveGoal}
-                onDelete={handleDeleteGoal}
-                onClose={() => setIsGoalManagerOpen(false)}
-              />
+            {
+              isGoalManagerOpen && (
+                <GoalManager
+                  goals={goals}
+                  onSave={handleSaveGoal}
+                  onDelete={handleDeleteGoal}
+                  onClose={() => setIsGoalManagerOpen(false)}
+                />
               )
             }
             {
               isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
+            }
+            {
+              isReflectionOpen && (
+                <DailyReflection
+                  initialReflection={reflectionText}
+                  isDrafting={isDraftingAI}
+                  onSave={handleSaveReflection}
+                  onDraft={handleDraftReflection}
+                  onClose={() => setIsReflectionOpen(false)}
+                />
+              )
             }
             <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
               <div className="w-full max-w-2xl mb-8 mx-auto">
@@ -369,6 +432,14 @@ export default function Home() {
                     />
                   </div>
                 </div>
+              </div>
+              <div className="w-full max-w-2xl mb-8 mx-auto text-center">
+                <button 
+                    onClick={() => setIsReflectionOpen(true)}
+                    className="bg-green-600 hover:bg-green-700 p-3 rounded-md font-bold text-lg"
+                >
+                    End Day & Reflect
+                </button>
               </div>
               <div>
                 <div className="text-center mb-8">
