@@ -178,6 +178,11 @@ export default function Home() {
         </div>
         <div>
           <div className="text-center mb-8">
+            <div className="bg-white/10 rounded-lg p-8 inline-block">
+              <h2 className="text-8xl font-bold">
+                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+              </h2>
+            </div>
             <div className="flex justify-center gap-4 mb-4 text-center">
             <div>
               <label htmlFor="focus-duration" className="block text-sm text-gray-400">Focus Minutes</label>
