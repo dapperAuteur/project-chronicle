@@ -62,7 +62,6 @@ export default function TaskItem({
           // onChange={handleToggleClick} // We'll reuse the click handler logic
           onChange={handleToggleChange}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
-          className="w-5 h-5 rounded accent-blue-500"
         />
         <div className="flex items-center gap-2"> {/* Wrapper for buttons */}
           <button 

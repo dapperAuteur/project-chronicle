@@ -335,9 +335,9 @@ export default function Home() {
               isProfileOpen && user && <UserProfile user={user} onClose={() => setIsProfileOpen(false)} />
             }
             <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
-              <div className="w-full max-w-2xl mb-8">
-                <h2 className="text-2xl font-bold mb-4">Daily Focus</h2>
-                <div className="bg-white/10 p-4 rounded-lg space-y-4">
+              <div className="w-full max-w-2xl mb-8 mx-auto">
+                <h2 className="text-2xl font-bold mb-4 text-white">Daily Focus</h2>
+                <div className="bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-700">
                   <div>
                     <label htmlFor="goal-select" className="block text-sm font-bold mb-2 text-gray-300">
                       Which goal are you focusing on today?
@@ -346,7 +346,6 @@ export default function Home() {
                       id="goal-select"
                       value={selectedFocusGoalId || ''}
                       onChange={(e) => setSelectedFocusGoalId(e.target.value)}
-                      className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg"
                     >
                       <option value="" disabled>-- Select a Goal --</option>
                       {goals.map(goal => (
@@ -364,7 +363,7 @@ export default function Home() {
                       id="mission-input"
                       type="text"
                       placeholder="E.g., Complete the first draft of the landing page."
-                      className="w-full bg-gray-800 p-3 rounded-md border border-gray-700 text-lg"
+                      className="w-full p-3 rounded-md text-lg"
                       value={dailyMission}
                       onChange={(e) => setDailyMission(e.target.value)}
                     />
@@ -423,7 +422,7 @@ export default function Home() {
               <div>
                 <div className="w-full max-w-2xl mb-8">
                   <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-                  <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
+                  <form onSubmit={handleSubmit} className="bg-gray-800/50 p-4 rounded-lg flex flex-col gap-4 border border-gray-700">
                     <input
                       type="text"
                       placeholder="Task Name"

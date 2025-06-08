@@ -34,7 +34,7 @@ export default function GoalManager({ goals, onSave, onDelete, onClose }: GoalMa
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg">
+      <div className="bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-700">
         <h2 className="text-2xl font-bold mb-4 text-white">Manage Your Goals</h2>
 
         {/* Goal List */}
@@ -59,7 +59,6 @@ export default function GoalManager({ goals, onSave, onDelete, onClose }: GoalMa
               value={goalName}
               onChange={(e) => setGoalName(e.target.value)}
               placeholder="E.g., Launch my website"
-              className="w-full bg-gray-700 p-2 rounded-md text-white"
             />
             <div className="flex gap-4 mt-2">
                 <button onClick={handleSave} className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-white">
