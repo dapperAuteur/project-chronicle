@@ -281,7 +281,7 @@ export default function Home() {
         </div>
         <div>
           <div className="w-full max-w-2xl">
-            <h2 className="text-2xl font-bold mb-4">Today's Tasks</h2>
+            <h2 className="text-2xl font-bold mb-4">Today&apos;s Tasks</h2>
             <div className="space-y-4">
               {/* Render the tasks using your new component */}
               {tasks.map(task => (
