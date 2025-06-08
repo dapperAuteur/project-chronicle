@@ -1,35 +1,31 @@
 "use client"
 import { useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
-import { auth, db } from '@/lib/firebase';
+import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db, enableIndexedDbPersistence } from '@/lib/firebase';
 import TaskItem from "@/components/TaskItem";
 import UserProfile from "@/components/UserProfile";
 import { Task } from "@/types/task";
 import Auth from "@/components/Auth";
 
-// const FOCUS_TIME_SECONDS = 25 * 60; // 25 minutes
-// const BREAK_TIME_SECONDS = 5 * 60;  // 5 minutes
-
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([])
   const [taskName, setTaskName] = useState('');
+  const [taskNotes, setTaskNotes] = useState('');
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  // const [timeRemaining, setTimeRemaining] = useState(FOCUS_TIME_SECONDS);
-  const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState<'focus' | 'break'>('focus');
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   const [dailyFocus, setDailyFocus] = useState('');
   const [focusDuration, setFocusDuration] = useState(25);
   const [breakDuration, setBreakDuration] = useState(5);
-
+  const [isActive, setIsActive] = useState(false);
+  const [mode, setMode] = useState<'focus' | 'break'>('focus');
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [taskNotes, setTaskNotes] = useState('');
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -40,21 +36,16 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // This will hold the function to unsubscribe from the listener
-    let unsubscribe: (() => void) | undefined;
+    let tasksUnsubscribe: (() => void) | undefined;
 
     const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
 
-      // If a user is logged in, set up the tasks listener
       if (currentUser) {
-        // Point to the 'tasks' collection for the logged-in user
         const tasksCollection = collection(db, 'users', currentUser.uid, 'tasks');
         const q = query(tasksCollection);
-
-        // onSnapshot listens for real-time updates
-        unsubscribe = onSnapshot(q, (querySnapshot) => {
+        tasksUnsubscribe = onSnapshot(q, (querySnapshot) => {
           const tasksData = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
@@ -62,23 +53,20 @@ export default function Home() {
           setTasks(tasksData);
         });
       } else {
-        // If user is logged out, clear their tasks
         setTasks([]);
-        // If there was a listener, unsubscribe from it
-        if (unsubscribe) {
-          unsubscribe();
+        if (tasksUnsubscribe) {
+          tasksUnsubscribe();
         }
       }
     });
 
-    // Cleanup both subscriptions on unmount
     return () => {
       authUnsubscribe();
-      if (unsubscribe) {
-        unsubscribe();
+      if (tasksUnsubscribe) {
+        tasksUnsubscribe();
       }
     };
-  }, []); // This effect should still only run once
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -89,28 +77,40 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user){
+      setDailyFocus('');
+      return;
+    };
 
-    const today = getTodayDateString();
-    const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+    const getInitialFocus = async () => {
+      const today = getTodayDateString();
+      const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+      const docSnap = await getDoc(focusDocRef);
 
-    // Save the focus whenever it changes, but debounce it to avoid too many writes
+      if (docSnap.exists) {
+        setDailyFocus(docSnap.data().text);
+      }
+    }
+
+    getInitialFocus();
+  }, [user]);
+
+  useEffect(() => {
+    // Don't save if there's no user or if the focus field is empty initially.
+    if (!user || dailyFocus === '') {
+      return;
+    }
+    
+    // Debounce the save operation.
     const handler = setTimeout(() => {
-        if (dailyFocus) { // Only write if there is a focus set
-            setDoc(focusDocRef, { text: dailyFocus }, { merge: true });
-        }
-    }, 1000); // Wait 1 second after user stops typing
+      const today = getTodayDateString();
+      const focusDocRef = doc(db, 'users', user.uid, 'daily_focus', today);
+      setDoc(focusDocRef, { text: dailyFocus });
+    }, 1000); // Saves 1 second after the user stops typing.
 
-    // Load the focus once when the component mounts or user changes
-    const unsubscribe = onSnapshot(focusDocRef, (doc) => {
-        if (doc.exists()) {
-            setDailyFocus(doc.data().text);
-        }
-    });
-
+    // Cleanup the timeout if the component unmounts or the effect re-runs.
     return () => {
-        clearTimeout(handler);
-        unsubscribe();
+      clearTimeout(handler);
     };
   }, [dailyFocus, user]);
 
