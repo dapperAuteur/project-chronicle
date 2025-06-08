@@ -8,6 +8,7 @@ export interface Task {
   pomodorosCompleted: number;
   notes?: string;
   parentId: string | null;
+  deadline?: string;
   createdAt: string;
   updatedAt: string;
 }

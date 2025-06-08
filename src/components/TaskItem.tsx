@@ -1,4 +1,3 @@
-// src/components/TaskItem.tsx
 import { Task } from '@/types/task';
 import { MouseEvent } from 'react';
 
@@ -35,7 +34,7 @@ export default function TaskItem({
   level,
 }: TaskItemProps) {
   const containerClasses = `
-    bg-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer transition-colors
+    bg-white/10 p-2 rounded-lg flex justify-between items-center cursor-pointer transition-colors
     ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-white/20'}
   `;
 
@@ -70,9 +69,39 @@ export default function TaskItem({
     onToggleStatus(task.id);
   };
   const handleDeleteClick = (e: React.MouseEvent) => {
-      e.stopPropagation(); // Stop the click from bubbling up to the parent div
-      onDelete(task.id);
-    };
+    e.stopPropagation(); // Stop the click from bubbling up to the parent div
+    onDelete(task.id);
+  };
+
+  const getDeadlineInfo = () => {
+    if (!task.deadline) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+
+    // Adjust for timezone offset before creating the deadline date
+    const deadlineDate = new Date(task.deadline + 'T00:00:00');
+
+    const diffTime = deadlineDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (task.status === 'Done') {
+        return { text: `Done`, color: 'text-green-500' };
+    }
+    if (diffDays < 0) {
+      return { text: `Overdue by ${Math.abs(diffDays)} day(s)`, color: 'text-red-500 font-bold' };
+    }
+    if (diffDays === 0) {
+      return { text: 'Due Today', color: 'text-amber-500 font-bold' };
+    }
+    if (diffDays <= 7) {
+      return { text: `Due in ${diffDays} day(s)`, color: 'text-amber-400' };
+    }
+    return { text: `Due: ${task.deadline}`, color: 'text-gray-400' };
+  };
+
+  const deadlineInfo = getDeadlineInfo();
+
   return (
     <div
       className={containerClasses}
@@ -100,6 +129,11 @@ export default function TaskItem({
           <p className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
             {task.name}
           </p>
+          {deadlineInfo && (
+            <span className={`text-xs ${deadlineInfo.color}`}>
+              {deadlineInfo.text}
+            </span>
+          )}
           {task.notes && <p className="text-xs text-gray-400 italic truncate">"{task.notes}"</p>}
         </div>
       </div>

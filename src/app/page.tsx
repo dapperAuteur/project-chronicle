@@ -32,6 +32,7 @@ export default function Home() {
   const [topStreaks, setTopStreaks] = useState<number[]>([]);
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
   const [collapsedTasks, setCollapsedTasks] = useState<string[]>([]);
+  const [taskDeadline, setTaskDeadline] = useState('');
 
   // Data State
   const [tasks, setTasks] = useState<Task[]>([])
@@ -103,6 +104,7 @@ export default function Home() {
     setTaskNotes('');
     setEditingTaskId(null);
     setSubtaskParentId(null);
+    setTaskDeadline('');
     categoryManuallySet.current = false; // Reset for the next new task
   };
 
@@ -205,15 +207,17 @@ export default function Home() {
     return () => unsubscribe();
   }, [user]);
 
-  const handleSaveGoal = async (goalName: string, goalId?: string) => {
+  const handleSaveGoal = async (goalName: string, deadline: string, goalId?: string) => {
     if (!user) return;
     const goalsCollectionRef = collection(db, 'users', user.uid, 'goals');
 
+    const data = { name: goalName, deadline: deadline || null };
+
     if (goalId) { // Editing existing goal
       const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
-      await updateDoc(goalDocRef, { name: goalName });
+      await updateDoc(goalDocRef, data);
     } else { // Adding new goal
-      await addDoc(goalsCollectionRef, { name: goalName });
+      await addDoc(goalsCollectionRef, data);
     }
   };
 
@@ -539,6 +543,7 @@ export default function Home() {
       setTaskCategory(taskToEdit.category);
       setTaskPriority(taskToEdit.priority);
       setTaskNotes(taskToEdit.notes || '');
+      setTaskDeadline(taskToEdit.deadline || '');
     }
   };
 
@@ -568,26 +573,26 @@ export default function Home() {
 
     const now = new Date().toISOString;
 
+    const taskData = {
+      name: taskName,
+      category: taskCategory,
+      priority: taskPriority,
+      notes: taskNotes,
+      updatedAt: now,
+      deadline: taskDeadline || null,
+    };
+
     if (editingTaskId) {
       const taskDocRef = doc(db, 'users', user.uid, 'tasks', editingTaskId);
-      await updateDoc(taskDocRef, {
-        name: taskName,
-        category: taskCategory,
-        priority: taskPriority,
-        notes: taskNotes,
-        updatedAt: now,
-      });
+      await updateDoc(taskDocRef, taskData);
       setEditingTaskId(null);
     } else {
       const tasksCollectionRef = collection(db, 'users', user.uid, 'tasks');
       await addDoc(tasksCollectionRef, {
-        name: taskName,
-        category: taskCategory,
-        priority: taskPriority,
+        ...taskData,
         status: 'To Do',
         pomodorosCompleted: 0,
         createdAt: now,
-        updatedAt: now,
         parentId: subtaskParentId,
       });
     }
@@ -752,7 +757,7 @@ export default function Home() {
               <div>
                 <div className="w-full max-w-2xl mb-8">
                   <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-                  <form onSubmit={handleSubmit} className="bg-gray-800/50 p-4 rounded-lg flex flex-col gap-4 border border-gray-700">
+                  <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
                     <input
                       id="task-name-input"
                       type="text"
@@ -783,6 +788,16 @@ export default function Home() {
                       onChange={(e) => setTaskNotes(e.target.value)}
                      >
                     </textarea>
+                      <div className="flex-grow">
+                      <label htmlFor="task-deadline" className="text-sm text-gray-400">Deadline (Optional)</label>
+                      <input
+                        id="task-deadline"
+                        type="date"
+                        value={taskDeadline}
+                        onChange={(e) => setTaskDeadline(e.target.value)}
+                        className="w-full bg-gray-800 p-2 rounded-md border border-gray-700"
+                      />
+                    </div>
                     <button
                       type="submit"
                       className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-blue-50"

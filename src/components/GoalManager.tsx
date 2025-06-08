@@ -13,35 +13,42 @@ interface GoalManagerProps {
 export default function GoalManager({ goals, onSave, onDelete, onClose }: GoalManagerProps) {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [goalName, setGoalName] = useState('');
+  const [deadline, setDeadline] = useState('');
 
   const handleSave = () => {
     if (goalName.trim()) {
-      onSave(goalName, editingGoal?.id);
+      onSave(goalName, deadline, editingGoal?.id);
       setEditingGoal(null);
       setGoalName('');
+      setDeadline('');
     }
   };
 
   const startEditing = (goal: Goal) => {
     setEditingGoal(goal);
     setGoalName(goal.name);
+    setDeadline(goal.deadline || '');
   }
 
   const startNew = () => {
     setEditingGoal(null);
     setGoalName('');
+    setDeadline('');
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-      <div className="bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-700">
-        <h2 className="text-2xl font-bold mb-4 text-white">Manage Your Goals</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+      <div className="bg-gray-800/50 p-6 rounded-lg shadow-xl w-full max-w-lg border border-gray-700">
+        <h2 className="text-2xl font-bold mb-4">Manage Your Goals</h2>
 
         {/* Goal List */}
         <div className="space-y-2 mb-4">
           {goals.map(goal => (
             <div key={goal.id} className="flex justify-between items-center bg-white/10 p-2 rounded">
-              <span>{goal.name}</span>
+              <div>
+                <p>{goal.name}</p>
+                {goal.deadline && <p className="text-xs text-amber-400">Due: {goal.deadline}</p>}
+              </div>
               <div>
                 <button onClick={() => startEditing(goal)} className="text-blue-400 mr-2">✏️</button>
                 <button onClick={() => onDelete(goal.id)} className="text-red-400">🗑️</button>
@@ -52,16 +59,25 @@ export default function GoalManager({ goals, onSave, onDelete, onClose }: GoalMa
 
         {/* Add/Edit Form */}
         {(goals.length < 3 || editingGoal) && (
-          <div className="border-t border-gray-700 pt-4 text-white">
-            <h3 className="font-bold mb-2 text-white">{editingGoal ? 'Edit Goal' : 'Add New Goal'}</h3>
+          <div className="border-t border-gray-700 pt-4">
+            <h3 className="font-bold mb-2">{editingGoal ? 'Edit Goal' : 'Add New Goal'}</h3>
             <input
               type="text"
               value={goalName}
               onChange={(e) => setGoalName(e.target.value)}
               placeholder="E.g., Launch my website"
+              className="w-full bg-gray-700 p-2 rounded-md mb-2"
+            />
+            <label htmlFor="goal-deadline" className="text-sm text-gray-400">Deadline (Optional)</label>
+            <input
+              id="goal-deadline"
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="w-full bg-gray-700 p-2 rounded-md"
             />
             <div className="flex gap-4 mt-2">
-                <button onClick={handleSave} className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-white">
+                <button onClick={handleSave} className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold">
                     {editingGoal ? 'Update Goal' : 'Save Goal'}
                 </button>
                 {editingGoal && <button onClick={startNew} className="w-full bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">New</button>}
