@@ -1,49 +1,54 @@
-"use client"
-import { useEffect, useMemo, useRef, useState } from "react";
-import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, orderBy } from "firebase/firestore";
+ "use client";
+
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
+import { signOut } from 'firebase/auth';
+import {
+  collection,
+  query,
+  onSnapshot,
+  addDoc,
+  doc,
+  updateDoc,
+  deleteDoc,
+  setDoc,
+  getDoc,
+  orderBy,
+  Unsubscribe,
+} from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import TaskItem from "@/components/TaskItem";
-import UserProfile from "@/components/UserProfile";
+import { useAuth } from '@/hooks/useAuth';
+import { useFirestore } from '@/hooks/useFirestore';
+import { useTimer } from '@/hooks/useTimer';
 import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
 import { Milestone } from "@/types/milestone";
+
+import Header from '@/components/Header';
 import Auth from "@/components/Auth";
+import UserProfile from "@/components/UserProfile";
 import GoalManager from "@/components/GoalManager";
 import DailyReflection from '@/components/DailyReflection';
-import StreakDisplay from "@/components/StreakDisplay";
-
-const categoryKeywords: { [key: string]: string[] } = {
-  'Work': ['project', 'report', 'meeting', 'presentation', 'deadline'],
-  'Learning': ['learn', 'study', 'read', 'course', 'tutorial'],
-  'Communication': ['call', 'email', 'message', 'chat', 'contact'],
-  'Health': ['workout', 'gym', 'run', 'meditate', 'doctor'],
-  'Personal': ['errand', 'buy', 'shop', 'clean', 'organize'],
-  'Design': ['design', 'mockup', 'figma', 'prototype', 'sketch'],
-};
+import ControlPanel from '@/components/ControlPanel';
+import TaskList from '@/components/TaskList';
 
 export default function Home() {
-  // Component State
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const { user, loading } = useAuth();
+  const { tasks, goals, streak, topStreaks } = useFirestore(user);
+
+  const [milestonesByGoal, setMilestonesByGoal] = useState<Record<string, Milestone[]>>({});
+  const [currentMilestones, setCurrentMilestones] = useState<Milestone[]>([]);
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
-  const [streak, setStreak] = useState(0);
-  const [topStreaks, setTopStreaks] = useState<number[]>([]);
-  const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
-  const [collapsedTasks, setCollapsedTasks] = useState<string[]>([]);
-  const [taskDeadline, setTaskDeadline] = useState('');
-  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
-  const [currentMilestones, setCurrentMilestones] = useState<Milestone[]>([]);
 
-  // Data State
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [goals, setGoals] = useState<Goal[]>([])
-
-  // Daily Focus State
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedFocusGoalId, setSelectedFocusGoalId] = useState<string | null>(null);
   const [dailyMission, setDailyMission] = useState('');
+  const [reflectionText, setReflectionText] = useState('');
+  const [isDraftingAI, setIsDraftingAI] = useState(false);
 
   // Form State
   const [taskName, setTaskName] = useState('');
@@ -51,18 +56,31 @@ export default function Home() {
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
+  const [taskDeadline, setTaskDeadline] = useState('');
+  const categoryManuallySet = useRef(false);
 
-  // Timer State
-  const [focusDuration, setFocusDuration] = useState(25);
-  const [breakDuration, setBreakDuration] = useState(5);
-  const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState<'focus' | 'break'>('focus');
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState(focusDuration * 60);
+  const handleSessionComplete = (completedMode: 'focus' | 'break') => {
+    if (completedMode === 'focus' && selectedTaskId && user) {
+      const taskDocRef = doc(db, 'users', user.uid, 'tasks', selectedTaskId);
+      const task = tasks.find(t => t.id === selectedTaskId);
+      if (task) {
+        updateDoc(taskDocRef, { 
+          pomodorosCompleted: task.pomodorosCompleted + 1,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+  };
 
-  // NEW: Daily Reflection State
-  const [reflectionText, setReflectionText] = useState('');
-  const [isDraftingAI, setIsDraftingAI] = useState(false);
+  const {
+    minutes, seconds, isActive, toggleTimer, resetTimer,
+    focusDuration, setFocusDuration, breakDuration, setBreakDuration
+  } = useTimer({
+    initialFocusDuration: 25,
+    initialBreakDuration: 5,
+    onSessionComplete: handleSessionComplete,
+  });
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -72,34 +90,30 @@ export default function Home() {
     return `${year}-${month}-${day}`;
   };
 
-  const categoryManuallySet = useRef(false);
-
+  // All data fetching is handled by custom hooks, this component just uses the data.
+  // Milestone fetching remains here as it depends on the `goals` state.
   useEffect(() => {
-    // If the user has already typed in the category box, don't override them.
-    if (categoryManuallySet.current) {
+    if (!user || goals.length === 0) {
+      setMilestonesByGoal({});
       return;
     }
+    const unsubscribers: Unsubscribe[] = [];
+    goals.forEach(goal => {
+      const milestonesCollection = collection(db, 'users', user.uid, 'goals', goal.id, 'milestones');
+      const q = query(milestonesCollection, orderBy('deadline', 'asc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const milestonesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Milestone[];
+        setMilestonesByGoal(prev => ({ ...prev, [goal.id]: milestonesData }));
+      });
+      unsubscribers.push(unsubscribe);
+    });
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [user, goals]);
 
-    const lowerCaseTaskName = taskName.toLowerCase();
+  useEffect(() => {
+    setCurrentMilestones(expandedGoalId ? milestonesByGoal[expandedGoalId] || [] : []);
+  }, [expandedGoalId, milestonesByGoal]);
 
-    // Find the first category that has a keyword matching the task name
-    const suggestedCategory = Object.keys(categoryKeywords).find(category =>
-      categoryKeywords[category].some(keyword => lowerCaseTaskName.includes(keyword))
-    );
-
-    if (suggestedCategory) {
-      setTaskCategory(suggestedCategory);
-    }
-    // If no keyword matches, we don't change the category
-    
-  }, [taskName]);
-
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    categoryManuallySet.current = true; // Mark as manually changed
-    setTaskCategory(e.target.value);
-  };
-
-  // NEW: When the form is submitted, reset the manual override flag
   const resetFormState = () => {
     setTaskName('');
     setTaskCategory('');
@@ -108,7 +122,37 @@ export default function Home() {
     setEditingTaskId(null);
     setSubtaskParentId(null);
     setTaskDeadline('');
-    categoryManuallySet.current = false; // Reset for the next new task
+    categoryManuallySet.current = false;
+  };
+  
+  const handleCategoryChange = (e: ChangeEvent<HTMLInputElement>) => {
+    categoryManuallySet.current = true;
+    setTaskCategory(e.target.value);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!taskName.trim() || !user) return;
+    const now = new Date().toISOString();
+    const taskData = {
+      name: taskName,
+      category: taskCategory,
+      priority: taskPriority,
+      notes: taskNotes,
+      updatedAt: now,
+      deadline: taskDeadline || null };
+    if (editingTaskId) {
+      await updateDoc(doc(db, 'users', user.uid, 'tasks', editingTaskId), taskData);
+    } else {
+      await addDoc(collection(db, 'users', user.uid, 'tasks'), {
+        ...taskData,
+        status: 'To Do',
+        pomodorosCompleted: 0,
+        createdAt: now,
+        parentId: subtaskParentId
+      });
+    }
+    resetFormState();
   };
 
   const handleAddSubtask = (parentId: string) => {
@@ -117,98 +161,6 @@ export default function Home() {
     // Optional: focus the task name input field
     document.getElementById('task-name-input')?.focus();
   };
-
-  const handleToggleCollapse = (taskId: string) => {
-    setCollapsedTasks(prevCollapsed => {
-      if (prevCollapsed.includes(taskId)) {
-        // If it's already collapsed, expand it by removing it from the array
-        return prevCollapsed.filter(id => id !== taskId);
-      } else {
-        // If it's expanded, collapse it by adding it to the array
-        return [...prevCollapsed, taskId];
-      }
-    });
-  };
-
-  const taskTree = useMemo(() => {
-    const tree: (Task & { children: Task[] })[] = [];
-    const childrenOf: { [key: string]: (Task & { children: Task[] })[] } = {};
-
-    tasks.forEach(task => {
-      const newTask = { ...task, children: [] };
-      if (task.parentId) {
-        childrenOf[task.parentId] = childrenOf[task.parentId] || [];
-        childrenOf[task.parentId].push(newTask);
-      } else {
-        tree.push(newTask);
-      }
-    });
-
-    tasks.forEach(task => {
-      if (childrenOf[task.id]) {
-        const taskInTree = tree.find(t => t.id === task.id) || 
-                           Object.values(childrenOf).flat().find(t => t.id === task.id);
-        if (taskInTree) {
-          taskInTree.children = childrenOf[task.id];
-        }
-      }
-    });
-    
-    return tree;
-  }, [tasks]);
-
-  const renderTasks = (tasksToRender: (Task & { children: Task[] })[], level: number) => {
-    return tasksToRender.map(task => {
-      const isCollapsed = collapsedTasks.includes(task.id);
-      const hasChildren = task.children && task.children.length > 0;
-      
-      return (
-        <div key={task.id}>
-          <TaskItem
-            task={task}
-            isSelected={task.id === selectedTaskId}
-            isActive={isActive && selectedTaskId === task.id}
-            isCollapsed={isCollapsed}
-            hasChildren={hasChildren}
-            onToggleStatus={handleToggleStatus}
-            onDelete={handleDeleteTask}
-            onEdit={handleStartEditing}
-            onAdjustPomodoros={handleAdjustPomodoros}
-            onClick={setSelectedTaskId}
-            onAddSubtask={handleAddSubtask}
-            onToggleCollapse={handleToggleCollapse}
-            level={level}
-          />
-          {/* NEW: Conditionally render children only if the task is NOT collapsed */}
-          {!isCollapsed && hasChildren && (
-            <div className="border-l-2 border-gray-700/50">
-               {renderTasks(task.children, level + 1)}
-            </div>
-          )}
-        </div>
-      );
-    });
-  };
-
-  useEffect(() => {
-    if (!user) {
-      setGoals([]);
-      return;
-    }
-
-    const goalsCollection = collection(db, 'users', user.uid, 'goals');
-    const q = query(goalsCollection);
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const goalsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Goal[];
-      setGoals(goalsData);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
 
   const handleGoalSave = async (goalName: string, deadline: string, goalId?: string) => {
     if (!user) return;
@@ -229,76 +181,6 @@ export default function Home() {
     const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
     await deleteDoc(goalDocRef);
   };
-
-  // Main Data Loading useEffect
-  useEffect(() => {
-    let tasksUnsubscribe: (() => void) | undefined;
-    let goalsUnsubscribe: (() => void) | undefined;
-    let reflectionUnsubscribe: (() => void) | undefined;
-    let statsUnsubscribe: (() => void) | undefined;
-
-    const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-
-      if (currentUser) {
-        // Fetch Tasks
-        const tasksCollection = collection(db, 'users', currentUser.uid, 'tasks');
-        tasksUnsubscribe = onSnapshot(query(tasksCollection), (snapshot) => {
-          setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[]);
-        });
-
-        // Fetch Goals
-        const goalsCollection = collection(db, 'users', currentUser.uid, 'goals');
-        goalsUnsubscribe = onSnapshot(query(goalsCollection), (snapshot) => {
-          setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Goal[]);
-        });
-
-        // NEW: Fetch today's reflection
-        const today = getTodayDateString();
-        const reflectionDocRef = doc(db, 'users', currentUser.uid, 'daily_reflection', today);
-        reflectionUnsubscribe = onSnapshot(reflectionDocRef, (doc) => {
-          if (doc.exists()) {
-            setReflectionText(doc.data().text);
-          } else {
-            setReflectionText('');
-          }
-        });
-
-        const statsDocRef = doc(db, 'users', currentUser.uid, 'stats', 'user_stats');
-          statsUnsubscribe = onSnapshot(statsDocRef, (doc) => {
-            if (doc.exists()) {
-              const data = doc.data();
-              setStreak(doc.data().reflectionStreak || 0);
-              setTopStreaks(data.topStreaks || []);
-            } else {
-              setStreak(0);
-              setTopStreaks([]);
-            }
-          }
-        );
-      } else {
-        // Clear all data on logout
-        setTasks([]);
-        setGoals([]);
-        setReflectionText('');
-        setStreak(0);
-        setTopStreaks([]);
-        if (tasksUnsubscribe) tasksUnsubscribe();
-        if (goalsUnsubscribe) goalsUnsubscribe();
-        if (reflectionUnsubscribe) reflectionUnsubscribe();
-        if (statsUnsubscribe) statsUnsubscribe();
-      }
-    });
-
-    return () => {
-      authUnsubscribe();
-      if (tasksUnsubscribe) tasksUnsubscribe();
-      if (goalsUnsubscribe) goalsUnsubscribe();
-      if (reflectionUnsubscribe) reflectionUnsubscribe();
-      if (statsUnsubscribe) statsUnsubscribe();
-    };
-  }, []);
 
   const handleSaveReflection = async (newReflectionText: string) => {
     if (!user) return;
@@ -512,63 +394,6 @@ export default function Home() {
     };
   }, [selectedFocusGoalId, dailyMission, user, goals]);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout | undefined = undefined;
-
-    // Only run the timer if it's active and there's time left
-    if (isActive && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining(time => time - 1);
-      }, 1000);
-    } else if (timeRemaining === 0) {
-      // Handle session completion here (we'll do this in the next task)
-      console.log("Session's over!");
-      setIsActive(false); // Stop the timer
-      new Audio('/sounds/its_time.wav').play();
-      if (mode === 'focus') {
-        if (selectedTaskId && user) {
-          const taskDocRef = doc(db, 'users', user?.uid, 'tasks', selectedTaskId);
-          const taskToUpdate = tasks.find(t => t.id === selectedTaskId);
-          if (taskToUpdate) {
-            const incrementPomodoros = async () => {
-              try {
-                await updateDoc(taskDocRef, {
-                  pomodorosCompleted: taskToUpdate.pomodorosCompleted + 1,
-                  updatedAt: new Date().toISOString(),
-                });
-              } catch (error) {
-                console.error("Error updating pomodoros:", error);
-              }
-            };
-            incrementPomodoros();
-          }
-        }
-        setMode('break');
-        setTimeRemaining(breakDuration * 60);
-        setIsActive(true);
-      } else {
-        setMode('focus');
-        setTimeRemaining(focusDuration * 60);
-        setIsActive(false);
-      }
-    }
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isActive, timeRemaining, mode, selectedTaskId, focusDuration, breakDuration, user, tasks, /*db**/]);
-
-  const toggleTimer = () => {
-    setIsActive(!isActive);
-  };
-
-  const resetTimer = () => {
-    setIsActive(false);
-    setMode('focus');
-    setTimeRemaining(focusDuration * 60); // Use state instead of constant
-  };
-
   const handleAdjustPomodoros = async (taskId: string, amount: number) => {
     if (!user) return;
     const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
@@ -591,6 +416,7 @@ export default function Home() {
       setTaskPriority(taskToEdit.priority);
       setTaskNotes(taskToEdit.notes || '');
       setTaskDeadline(taskToEdit.deadline || '');
+      setSubtaskParentId(null);
     }
   };
 
@@ -613,70 +439,21 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!taskName.trim() || !user) return;
-
-    const now = new Date().toISOString();
-
-    const taskData = {
-      name: taskName,
-      category: taskCategory,
-      priority: taskPriority,
-      notes: taskNotes,
-      updatedAt: now,
-      deadline: taskDeadline || null,
-    };
-
-    if (editingTaskId) {
-      const taskDocRef = doc(db, 'users', user.uid, 'tasks', editingTaskId);
-      await updateDoc(taskDocRef, taskData);
-      setEditingTaskId(null);
-    } else {
-      const tasksCollectionRef = collection(db, 'users', user.uid, 'tasks');
-      await addDoc(tasksCollectionRef, {
-        ...taskData,
-        status: 'To Do',
-        pomodorosCompleted: 0,
-        createdAt: now,
-        parentId: subtaskParentId,
-      });
-    }
-    resetFormState();
-  };
-
-  const minutes = Math.floor(timeRemaining / 60);
-  const seconds = timeRemaining % 60;
-
   if (loading) {
     return <p className="flex min-h-screen items-center justify-center">Loading...</p>;
   }
 
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <div>
-          <h1 className="text-2xl font-bold mb-4 text-white">Project Chronicle</h1>
-        </div>
-        
-        {user ? (
-          <>
-            <div className="w-full max-w-2xl flex justify-between items-center mb-8">
-              <div>
-                <p className="text-l font-bold mb-4 text-white">Welcome, {user.email}</p>
-                <StreakDisplay count={streak} />
-              </div>
-              <div className="flex gap-4">
-                <button onClick={() => setIsGoalManagerOpen(true)} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white">
-                  Manage Goals
-                </button>
-                <button onClick={() => setIsProfileOpen(true)} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">
-                    Profile
-                  </button>
-                <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold">Sign Out</button>
-              </div>
-            </div>
+    <main className="flex min-h-screen flex-col items-center p-4 sm:p-8 md:p-12 bg-gray-900 text-gray-200 font-sans">
+      {user ? (
+        <>
+          <Header
+            user={user}
+            streak={streak}
+            onOpenGoalManager={() => setIsGoalManagerOpen(true)}
+            onOpenProfile={() => setIsProfileOpen(true)}
+            onSignOut={handleSignOut}
+          />
             {
               isGoalManagerOpen && (
                 <GoalManager
@@ -689,6 +466,7 @@ export default function Home() {
                   onMilestoneToggle={handleToggleMilestoneStatus}
                   onMilestoneDelete={handleDeleteMilestone}
                   onExpandGoal={setExpandedGoalId}
+                  progressByGoal={streak}
                   onClose={() => {
                     setIsGoalManagerOpen(false);
                     setExpandedGoalId(null);
@@ -696,16 +474,9 @@ export default function Home() {
                 />
               )
             }
-            {
-              isProfileOpen && user && (
-                <UserProfile
-                  user={user}
-                  topStreaks={topStreaks}
-                  onClose={
-                    () => setIsProfileOpen(false)} 
-                />
-              )
-            }
+            {isProfileOpen && user && (
+            <UserProfile user={user} topStreaks={topStreaks} onClose={() => setIsProfileOpen(false)} />
+          )}
             {
               isReflectionOpen && (
                 <DailyReflection
@@ -717,183 +488,51 @@ export default function Home() {
                 />
               )
             }
-            <div className="w-full max-w-2xl my-8 h-px bg-gray-700" />        
-              <div className="w-full max-w-2xl mb-8 mx-auto">
-                <h2 className="text-2xl font-bold mb-4 text-white">Daily Focus</h2>
-                <div className="bg-gray-800/50 p-4 rounded-lg space-y-4 border border-gray-700">
-                  <div>
-                    <label htmlFor="goal-select" className="block text-sm font-bold mb-2 text-gray-300">
-                      Which goal are you focusing on today?
-                    </label>
-                    <select
-                      id="goal-select"
-                      value={selectedFocusGoalId || ''}
-                      onChange={(e) => setSelectedFocusGoalId(e.target.value)}
-                    >
-                      <option value="" disabled>-- Select a Goal --</option>
-                      {goals.map(goal => (
-                        <option key={goal.id} value={goal.id}>
-                          {goal.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="mission-input" className="block text-sm font-bold mb-2 text-gray-300">
-                      What is your specific mission? (Optional)
-                    </label>
-                    <input
-                      id="mission-input"
-                      type="text"
-                      placeholder="E.g., Complete the first draft of the landing page."
-                      className="w-full p-3 rounded-md text-lg"
-                      value={dailyMission}
-                      onChange={(e) => setDailyMission(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="w-full max-w-2xl mb-8 mx-auto text-center">
-                <button 
-                    onClick={() => setIsReflectionOpen(true)}
-                    className="bg-green-600 hover:bg-green-700 p-3 rounded-md font-bold text-lg"
-                >
-                    End Day & Reflect
-                </button>
-              </div>
-              <div>
-                <div className="text-center mb-8">
-                  <div className="bg-white/10 rounded-lg p-8 inline-block">
-                    <h2 className="text-8xl font-bold">
-                      {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-                    </h2>
-                  </div>
-                  <div className="flex justify-center gap-4 mb-4 text-center">
-                  <div>
-                    <label htmlFor="focus-duration" className="block text-sm text-gray-400">Focus Minutes</label>
-                    <input
-                      id="focus-duration"
-                      type="number"
-                      value={focusDuration}
-                      onChange={(e) => setFocusDuration(Number(e.target.value))}
-                      className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
-                      disabled={isActive} // Disable input while timer is running
-                    />
-                    </div>
-                    <div>
-                      <label htmlFor="break-duration" className="block text-sm text-gray-400">Break Minutes</label>
-                      <input
-                        id="break-duration"
-                        type="number"
-                        value={breakDuration}
-                        onChange={(e) => setBreakDuration(Number(e.target.value))}
-                        className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center text-amber-50"
-                        disabled={isActive} // Disable input while timer is running
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 space-x-4">
-                    <button
-                      onClick={toggleTimer} // <-- Add this
-                      className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold w-24 text-amber-50"
-                    >
-                      {
-                        isActive ? 'Pause' : 'Start'
-                      }
-                    </button>
-                    <button
-                      onClick={resetTimer} // <-- Add this
-                      className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold w-24 text-amber-50"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="w-full max-w-2xl mb-8">
-                  <h2 className="text-2xl font-bold mb-4">Add New Task</h2>
-                  <form onSubmit={handleSubmit} className="bg-white/10 p-4 rounded-lg flex flex-col gap-4">
-                    <input
-                      id="task-name-input"
-                      type="text"
-                      placeholder="Task Name"
-                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-amber-50"
-                      value={taskName}
-                      onChange={(e) => setTaskName(e.target.value)}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Category"
-                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
-                      value={taskCategory}
-                      onChange={handleCategoryChange}
-                    />
-                    <select
-                    className="bg-gray-800 p-2 rounded-md border border-gray-700 text-blue-50"
-                      value={taskPriority}
-                      onChange={(e) => setTaskPriority(e.target.value as 'High' | 'Medium' | 'Low')}>
-                      <option>Low</option>
-                      <option>Medium</option>
-                      <option>High</option>
-                    </select>
-                    <textarea
-                      placeholder="Notes (optional)"
-                      className="bg-gray-800 p-2 rounded-md border border-gray-700 text-white"
-                      value={taskNotes}
-                      onChange={(e) => setTaskNotes(e.target.value)}
-                     >
-                    </textarea>
-                      <div className="flex-grow">
-                      <label htmlFor="task-deadline" className="text-sm text-gray-400">Deadline (Optional)</label>
-                      <input
-                        id="task-deadline"
-                        type="date"
-                        value={taskDeadline}
-                        onChange={(e) => setTaskDeadline(e.target.value)}
-                        className="w-full bg-gray-800 p-2 rounded-md border border-gray-700"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-blue-50"
-                    >
-                      {editingTaskId ? 'Update Task' : 'Add Task'}
-                    </button>
-                    {editingTaskId && (
-                      <button
-                        type="button"
-                        onClick={() => {resetFormState}}
-                        className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
-                      >
-                        Cancel
-                      </button>
-                      )
-                    }
-                    {
-                      subtaskParentId && !editingTaskId && (
-                        <div className="text-sm text-amber-400 p-2 bg-amber-900/50 rounded-md">
-                          Adding sub-task to: &quot;{tasks.find(t => t.id === subtaskParentId)?.name}&quot;
-                          <button
-                            type="button"
-                            onClick={() => setSubtaskParentId(null)}
-                            className="ml-2 text-red-400 font-bold"
-                            >[Cancel]
-                          </button>
-                        </div>
-                      )
-                    }
-                  </form>
-                </div>
-              </div>
-              <div>
-                <div className="w-full">
-                  <h2 className="text-2xl font-bold mb-4">Today&apos;s Tasks</h2>
-                  <div className="space-y-4">
-                    <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
-                      {renderTasks(taskTree, 0)}
-                    </div>
-                  </div>
+            <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-12 items-start mt-4">
+            <ControlPanel
+              goals={goals}
+              selectedFocusGoalId={selectedFocusGoalId}
+              onFocusGoalChange={setSelectedFocusGoalId}
+              dailyMission={dailyMission}
+              onMissionChange={setDailyMission}
+              minutes={minutes}
+              seconds={seconds}
+              timerIsActive={isActive}
+              onToggleTimer={toggleTimer}
+              onResetTimer={resetTimer}
+              focusDuration={focusDuration}
+              onFocusDurationChange={setFocusDuration}
+              breakDuration={breakDuration}
+              onBreakDurationChange={setBreakDuration}
+              tasks={tasks}
+              taskName={taskName}
+              onTaskNameChange={setTaskName}
+              taskCategory={taskCategory}
+              onTaskCategoryChange={handleCategoryChange}
+              taskPriority={taskPriority}
+              onTaskPriorityChange={setTaskPriority}
+              taskNotes={taskNotes}
+              onTaskNotesChange={setTaskNotes}
+              taskDeadline={taskDeadline}
+              onTaskDeadlineChange={setTaskDeadline}
+              editingTaskId={editingTaskId}
+              subtaskParentId={subtaskParentId}
+              onFormSubmit={handleSubmit}
+              onCancelEdit={resetFormState}
+            />
+              <div className="lg:col-span-1">
+              <h2 className="text-xl font-bold mb-4">Today&quot;s Tasks</h2>
+              <TaskList
+                tasks={tasks}
+                selectedTaskId={selectedTaskId}
+                timerIsActive={isActive}
+                onTaskClick={setSelectedTaskId}
+                onAddSubtask={handleAddSubtask}
+                onDelete={handleDeleteTask}
+                onToggleStatus={handleToggleStatus}
+                onEdit={handleStartEditing}
+                onAdjustPomodoros={handleAdjustPomodoros}
+                />
                 </div>
               </div>
           </>
@@ -901,6 +540,5 @@ export default function Home() {
             <Auth />
           )}
       </main>
-    </div>
   );
 }

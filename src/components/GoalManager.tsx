@@ -27,6 +27,7 @@ function MilestoneItem({ milestone, onToggle, onDelete }: { milestone: Milestone
 interface GoalManagerProps {
   goals: Goal[];
   activeGoalMilestones: Milestone[];
+  progressByGoal: Record<string, number>;
   expandedGoalId: string | null;
   onGoalSave: (goalName: string, deadline: string, goalId?: string) => void;
   onGoalDelete: (goalId: string) => void;
@@ -40,8 +41,8 @@ interface GoalManagerProps {
 export default function GoalManager({
   goals,
   activeGoalMilestones,
+  progressByGoal,
   expandedGoalId,
-  // onGoalSave,
   onGoalDelete,
   onMilestoneSave,
   onMilestoneToggle,
@@ -49,9 +50,6 @@ export default function GoalManager({
   onExpandGoal,
   onClose,
 }: GoalManagerProps) {
-  // const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  // const [goalName, setGoalName] = useState('');
-  // const [deadline, setDeadline] = useState('');
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [newMilestoneDeadline, setNewMilestoneDeadline] = useState('');
 
@@ -63,34 +61,15 @@ export default function GoalManager({
     }
   };
 
-  // const handleSave = () => {
-  //   if (goalName.trim()) {
-  //     onSave(goalName, deadline, editingGoal?.id);
-  //     setEditingGoal(null);
-  //     setGoalName('');
-  //     setDeadline('');
-  //   }
-  // };
-
-  // const startEditing = (goal: Goal) => {
-  //   setEditingGoal(goal);
-  //   setGoalName(goal.name);
-  //   setDeadline(goal.deadline || '');
-  // }
-
-  // const startNew = () => {
-  //   setEditingGoal(null);
-  //   setGoalName('');
-  //   setDeadline('');
-  // }
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl border border-gray-700">
         <h2 className="text-2xl font-bold mb-4">Goals & Milestones</h2>
         
         <div className="space-y-2 mb-4 max-h-[60vh] overflow-y-auto">
-          {goals.map(goal => (
+          {goals.map(goal => {
+            const progress = progressByGoal[goal.id] || 0;
+            return (
             <div key={goal.id} className="bg-white/10 p-3 rounded">
               <div className="flex justify-between items-center">
                 <div onClick={() => onExpandGoal(expandedGoalId === goal.id ? null : goal.id)} className="flex-grow cursor-pointer">
@@ -100,9 +79,20 @@ export default function GoalManager({
                 <button onClick={() => onGoalDelete(goal.id)} className="text-red-500 text-sm">Delete Goal</button>
               </div>
 
+              <div className="mt-3">
+                <div className="flex justify-between mb-1">
+                  <span className="text-xs font-medium text-gray-400">Progress</span>
+                  <span className="text-sm font-medium text-white">{Math.round(progress)}%</span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-2.5">
+                  <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                </div>
+              </div>
+
               {/* Expanded View for Milestones */}
               {expandedGoalId === goal.id && (
                 <div className="mt-4 border-t border-gray-700 pt-3 space-y-2">
+                  <h4 className="font-bold text-sm ml-4 mb-2">Milestones:</h4>
                   {activeGoalMilestones.map(milestone => (
                     <MilestoneItem key={milestone.id} milestone={milestone} onToggle={onMilestoneToggle} onDelete={onMilestoneDelete}/>
                   ))}
@@ -127,7 +117,8 @@ export default function GoalManager({
                 </div>
               )}
             </div>
-          ))}
+          )
+          })}
         </div>
         
         <button onClick={onClose} className="mt-4 w-full bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">Close</button>
