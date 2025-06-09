@@ -86,7 +86,7 @@ export default function Home() {
     setEstimatedPomos(pomos);
   };
 
-  const handleGetAiEstimate = () => {
+  const handleGetAiEstimate = async () => {
     setIsEstimating(true);
     setAiSuggestion(null);
 
