@@ -19,8 +19,6 @@ import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useTimer } from '@/hooks/useTimer';
-import { Goal } from "@/types/goal";
-import { Task } from "@/types/task";
 import { Milestone } from "@/types/milestone";
 
 import Header from '@/components/Header';

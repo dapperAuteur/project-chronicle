@@ -133,7 +133,7 @@ export default function ControlPanel({
           </div>
           {subtaskParentId && !editingTaskId && (
             <div className="text-sm text-amber-400 p-2 bg-amber-900/50 rounded-md">
-                Adding sub-task to: "{tasks.find(t => t.id === subtaskParentId)?.name}"
+                Adding sub-task to: &quot;{tasks.find(t => t.id === subtaskParentId)?.name}&quot;
                 <button type="button" onClick={onCancelEdit} className="ml-2 text-red-400 font-bold">[Cancel]</button>
             </div>
           )}
