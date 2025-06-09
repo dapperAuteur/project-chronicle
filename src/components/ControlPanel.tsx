@@ -44,6 +44,9 @@ interface ControlPanelProps {
   onTaskDeadlineChange: (date: string) => void;
   editingTaskId: string | null;
   subtaskParentId: string | null;
+  potentialParentTasks: Task[];
+  taskParentId: string | null;
+  onTaskParentChange: (id: string | null) => void;
   onFormSubmit: (e: FormEvent) => void;
   onCancelEdit: () => void;
 
@@ -64,8 +67,19 @@ export default function ControlPanel({
   focusDuration, onFocusDurationChange, breakDuration, onBreakDurationChange,
   tasks, taskName, onTaskNameChange, taskCategory, onTaskCategoryChange, taskPriority, onTaskPriorityChange,
   taskNotes, onTaskNotesChange, taskDeadline, onTaskDeadlineChange,
-  editingTaskId, subtaskParentId, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction, aiSuggestion, isEstimating, onGetAiEstimate,
+  editingTaskId, subtaskParentId, potentialParentTasks,
+  taskParentId,
+  onTaskParentChange, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction, aiSuggestion, isEstimating, onGetAiEstimate,
 }: ControlPanelProps) {
+
+  const getTaskDepth = (taskId: string, tasksById: Map<string, Task>, depth = 0): number => {
+    const task = tasksById.get(taskId);
+    if (task && task.parentId) {
+      return getTaskDepth(task.parentId, tasksById, depth + 1);
+    }
+    return depth;
+  };
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
   return (
     <div className="lg:col-span-1 space-y-8">
       {/* Daily Focus */}
@@ -135,6 +149,25 @@ export default function ControlPanel({
         </h2>
         <form onSubmit={onFormSubmit} className="bg-gray-800/50 p-4 rounded-lg flex flex-col gap-4 border border-gray-700">
           <input id="task-name-input" type="text" placeholder="Task Name" value={taskName} onChange={(e) => onTaskNameChange(e.target.value)} className="bg-gray-800 p-2 rounded-md border border-gray-700" />
+          {editingTaskId && (
+            <div>
+              <label htmlFor="parent-task-select" className="text-sm text-gray-400">Parent Task</label>
+              <select
+                id="parent-task-select"
+                value={taskParentId || ''}
+                onChange={(e) => onTaskParentChange(e.target.value || null)}
+                className="w-full bg-gray-800 p-2 rounded-md border border-gray-700"
+              >
+                <option value="">-- None (Top-Level Task) --</option>
+                {potentialParentTasks.map(task => (
+                  <option key={task.id} value={task.id}>
+                    {'\u00A0'.repeat(getTaskDepth(task.id, tasksById) * 4)}
+                    {task.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {selectedFocusGoalId && milestonesForFocusGoal.length > 0 && (
             <div>
               <label htmlFor="milestone-select" className="text-sm text-gray-400">Assign to Milestone (Optional)</label>

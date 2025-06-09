@@ -63,6 +63,7 @@ export default function Home() {
   const [taskCategory, setTaskCategory] = useState('');
   const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [taskParentId, setTaskParentId] = useState<string | null>(null);
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
   const [taskDeadline, setTaskDeadline] = useState('');
   const [selectedTaskMilestoneId, setSelectedTaskMilestoneId] = useState<string | null>(null);
@@ -247,6 +248,7 @@ export default function Home() {
     setTaskNotes('');
     setEditingTaskId(null);
     setSubtaskParentId(null);
+    setTaskParentId(null);
     setTaskDeadline('');
     setEstimatedPomos(1);
     pomosManuallySet.current = false;
@@ -272,6 +274,7 @@ export default function Home() {
       pomodorosCompleted: 0, // NEW: We will now track an estimated vs completed
       pomodorosEstimated: estimatedPomos,
       milestoneId: selectedTaskMilestoneId || null, // Is this needed
+      parentId: taskParentId,
     };
     if (editingTaskId) {
       await updateTask(editingTaskId, taskData);
@@ -541,10 +544,35 @@ export default function Home() {
       setSelectedTaskMilestoneId(taskToEdit.milestoneId || null);
       setEditingTaskId(taskId);
       setSubtaskParentId(null);
+      setTaskParentId(taskToEdit.parentId || null);
       setEstimatedPomos(taskToEdit.pomodorosEstimated || 1); // Load the saved estimate
       pomosManuallySet.current = true;
     }
   };
+
+  const potentialParentTasks = useMemo(() => {
+    if (!editingTaskId) return []; // Only calculate when editing a task
+
+    const tasksById = new Map(tasks.map(task => [task.id, task]));
+    const descendantIds = new Set<string>();
+
+    // Recursive function to find all children, grandchildren, etc.
+    const findDescendants = (parentId: string) => {
+      descendantIds.add(parentId);
+      tasks.forEach(task => {
+        if (task.parentId === parentId) {
+          findDescendants(task.id);
+        }
+      });
+    };
+
+    findDescendants(editingTaskId);
+
+    // A task cannot be its own parent or a child of one of its descendants.
+    // So, we filter out the task being edited and all of its children.
+    return tasks.filter(task => !descendantIds.has(task.id));
+
+  }, [tasks, editingTaskId]);
 
   const handleToggleStatus = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -661,6 +689,9 @@ export default function Home() {
               onTaskDeadlineChange={setTaskDeadline}
               editingTaskId={editingTaskId}
               subtaskParentId={subtaskParentId}
+              potentialParentTasks={potentialParentTasks}
+              taskParentId={taskParentId}
+              onTaskParentChange={setTaskParentId}
               estimatedPomos={estimatedPomos}
               onEstimatedPomosChange={handleEstimatedPomosChange}
               aiPrediction={aiPrediction}
