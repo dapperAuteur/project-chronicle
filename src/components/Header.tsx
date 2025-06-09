@@ -30,13 +30,13 @@ export default function Header({
             </div>
             <div className="flex gap-2 sm:gap-4">
               <button onClick={onOpenGoalManager} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white text-sm sm:text-base">
-                Goals
+               🏆 Goals
               </button>
               <button onClick={onOpenReport} className="bg-green-600 hover:bg-green-700 p-2 rounded-md font-bold text-white text-sm sm:text-base">
-                Report
+               📈 Report
               </button>
               <button onClick={onOpenProfile} className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold text-sm sm:text-base">
-                Profile
+               👤 Profile
               </button>
               <button onClick={onSignOut} className="bg-red-600 hover:bg-red-700 p-2 rounded-md font-bold text-sm sm:text-base">
                 Sign Out
