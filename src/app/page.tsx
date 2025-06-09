@@ -70,17 +70,36 @@ export default function Home() {
 
   const { prediction: aiPrediction } = usePrediction({ taskName });
   const pomosManuallySet = useRef(false);
+  const [aiSuggestion, setAiSuggestion] = useState<number | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
 
-   useEffect(() => {
-    // If user has not manually set the pomos and there is a prediction
-    if (!pomosManuallySet.current && aiPrediction) {
-      setEstimatedPomos(aiPrediction);
-    }
-  }, [aiPrediction]);
+  //  useEffect(() => {
+  //   // If user has not manually set the pomos and there is a prediction
+  //   if (!pomosManuallySet.current && aiPrediction) {
+  //     setEstimatedPomos(aiPrediction);
+  //   }
+  // }, [aiPrediction]);
 
   const handleEstimatedPomosChange = (pomos: number) => {
     pomosManuallySet.current = true; // Mark as manually changed
     setEstimatedPomos(pomos);
+  };
+
+  const handleGetAiEstimate = () => {
+    setIsEstimating(true);
+    setAiSuggestion(null);
+
+    // This is where the real TensorFlow.js logic will go.
+    // For now, we simulate the process.
+    console.log("Requesting AI prediction with task name:", taskName);
+
+    // Simulate a 1-second delay
+    setTimeout(() => {
+      const mockPrediction = Math.ceil(Math.random() * 5) + 1; // Random guess from 2-6
+      setAiSuggestion(mockPrediction);
+      setEstimatedPomos(mockPrediction); // Automatically apply the suggestion
+      setIsEstimating(false);
+    }, 1000);
   };
 
   const weeklyReportData = useMemo(() => {
@@ -611,6 +630,9 @@ export default function Home() {
               estimatedPomos={estimatedPomos}
               onEstimatedPomosChange={handleEstimatedPomosChange}
               aiPrediction={aiPrediction}
+              aiSuggestion={aiSuggestion}
+              isEstimating={isEstimating}
+              onGetAiEstimate={handleGetAiEstimate}
               onFormSubmit={handleSubmit}
               onCancelEdit={resetFormState}
             />

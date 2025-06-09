@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent } from 'react';
 import { Goal } from '@/types/goal';
 import { Task } from '@/types/task';
 import { Milestone } from '@/types/milestone';
+import AISuggestionControl from './AISuggestionControl';
 
 interface ControlPanelProps {
   // Focus Props
@@ -50,6 +51,11 @@ interface ControlPanelProps {
   estimatedPomos: number;
   onEstimatedPomosChange: (pomos: number) => void;
   aiPrediction: number | null;
+
+  // AI Estimation
+  aiSuggestion: number | null;
+  isEstimating: boolean;
+  onGetAiEstimate: () => void;
 }
 
 export default function ControlPanel({
@@ -58,7 +64,7 @@ export default function ControlPanel({
   focusDuration, onFocusDurationChange, breakDuration, onBreakDurationChange,
   tasks, taskName, onTaskNameChange, taskCategory, onTaskCategoryChange, taskPriority, onTaskPriorityChange,
   taskNotes, onTaskNotesChange, taskDeadline, onTaskDeadlineChange,
-  editingTaskId, subtaskParentId, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction,
+  editingTaskId, subtaskParentId, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction, aiSuggestion, isEstimating, onGetAiEstimate,
 }: ControlPanelProps) {
   return (
     <div className="lg:col-span-1 space-y-8">
@@ -156,7 +162,19 @@ export default function ControlPanel({
                 onChange={(e) => onEstimatedPomosChange(Number(e.target.value))}
                 className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center"
               />
-              {aiPrediction && !editingTaskId && (
+              <AISuggestionControl
+                tasks={tasks}
+                isEstimating={isEstimating}
+                onGetEstimate={onGetAiEstimate}
+              />
+              {
+                aiSuggestion && !isEstimating && (
+                  <p className="text-xs text-purple-400 mt-1">
+                    🤖 Suggestion: {aiSuggestion} pomodoro(s).
+                  </p>
+                )
+              }
+              {/* {aiPrediction && !editingTaskId && (
                 <div className="flex items-center gap-2 text-sm text-purple-400">
                   <span>🤖 AI Suggests: {aiPrediction}</span>
                   <button
@@ -167,7 +185,7 @@ export default function ControlPanel({
                     Use
                   </button>
                 </div>
-              )}
+              )} */}
             </div>
           </div>
           <input type="text" placeholder="Category" value={taskCategory} onChange={onTaskCategoryChange} className="bg-gray-800 p-2 rounded-md border border-gray-700" />
