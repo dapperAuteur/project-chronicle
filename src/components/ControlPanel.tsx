@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent } from 'react';
 import { Goal } from '@/types/goal';
 import { Task } from '@/types/task';
+import { Milestone } from '@/types/milestone';
 
 interface ControlPanelProps {
   // Focus Props
@@ -11,6 +12,11 @@ interface ControlPanelProps {
   onFocusGoalChange: (id: string) => void;
   dailyMission: string;
   onMissionChange: (mission: string) => void;
+
+  // Milestone Props
+  milestonesForFocusGoal: Milestone[];
+  selectedMilestoneId: string | null;
+  onMilestoneChange: (id: string) => void;
 
   // Timer Props
   minutes: number;
@@ -42,7 +48,7 @@ interface ControlPanelProps {
 }
 
 export default function ControlPanel({
-  goals, selectedFocusGoalId, onFocusGoalChange, dailyMission, onMissionChange,
+  goals, selectedFocusGoalId, onFocusGoalChange, dailyMission, onMissionChange,milestonesForFocusGoal, selectedMilestoneId, onMilestoneChange,
   minutes, seconds, timerIsActive, onToggleTimer, onResetTimer,
   focusDuration, onFocusDurationChange, breakDuration, onBreakDurationChange,
   tasks, taskName, onTaskNameChange, taskCategory, onTaskCategoryChange, taskPriority, onTaskPriorityChange,
@@ -118,6 +124,22 @@ export default function ControlPanel({
         </h2>
         <form onSubmit={onFormSubmit} className="bg-gray-800/50 p-4 rounded-lg flex flex-col gap-4 border border-gray-700">
           <input id="task-name-input" type="text" placeholder="Task Name" value={taskName} onChange={(e) => onTaskNameChange(e.target.value)} className="bg-gray-800 p-2 rounded-md border border-gray-700" />
+          {selectedFocusGoalId && milestonesForFocusGoal.length > 0 && (
+            <div>
+              <label htmlFor="milestone-select" className="text-sm text-gray-400">Assign to Milestone (Optional)</label>
+              <select
+                id="milestone-select"
+                value={selectedMilestoneId || ''}
+                onChange={(e) => onMilestoneChange(e.target.value)}
+                className="w-full bg-gray-800 p-2 rounded-md border border-gray-700"
+              >
+                <option value="">None</option>
+                {milestonesForFocusGoal.map(milestone => (
+                  <option key={milestone.id} value={milestone.id}>{milestone.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <input type="text" placeholder="Category" value={taskCategory} onChange={onTaskCategoryChange} className="bg-gray-800 p-2 rounded-md border border-gray-700" />
           <select value={taskPriority} onChange={(e) => onTaskPriorityChange(e.target.value as 'High' | 'Medium' | 'Low')} className="bg-gray-800 p-2 rounded-md border border-gray-700">
             <option>Low</option><option>Medium</option><option>High</option>

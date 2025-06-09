@@ -56,6 +56,7 @@ export default function Home() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
   const [taskDeadline, setTaskDeadline] = useState('');
+  const [selectedTaskMilestoneId, setSelectedTaskMilestoneId] = useState<string | null>(null);
   const categoryManuallySet = useRef(false);
 
   const handleSessionComplete = (completedMode: 'focus' | 'break') => {
@@ -138,7 +139,9 @@ export default function Home() {
       priority: taskPriority,
       notes: taskNotes,
       updatedAt: now,
-      deadline: taskDeadline || null };
+      deadline: taskDeadline || null ,
+      milestoneId: selectedTaskMilestoneId || null,
+    };
     if (editingTaskId) {
       await updateDoc(doc(db, 'users', user.uid, 'tasks', editingTaskId), taskData);
     } else {
@@ -414,6 +417,8 @@ export default function Home() {
       setTaskPriority(taskToEdit.priority);
       setTaskNotes(taskToEdit.notes || '');
       setTaskDeadline(taskToEdit.deadline || '');
+      setSelectedTaskMilestoneId(taskToEdit.milestoneId || null);
+      setEditingTaskId(taskId);
       setSubtaskParentId(null);
     }
   };
@@ -457,6 +462,11 @@ export default function Home() {
                 <GoalManager
                   goals={goals}
                   activeGoalMilestones={currentMilestones}
+                  progressByGoal={Object.keys(milestonesByGoal).reduce((acc, goalId) => {
+                  const milestones = milestonesByGoal[goalId];
+                  acc[goalId] = milestones?.length > 0 ? (milestones.filter(m => m.status === 'Complete').length / milestones.length) * 100 : 0;
+                  return acc;
+                }, {} as Record<string, number>)}
                   expandedGoalId={expandedGoalId}
                   onGoalSave={handleGoalSave}
                   onGoalDelete={handleDeleteGoal}
@@ -464,7 +474,6 @@ export default function Home() {
                   onMilestoneToggle={handleToggleMilestoneStatus}
                   onMilestoneDelete={handleDeleteMilestone}
                   onExpandGoal={setExpandedGoalId}
-                  progressByGoal={streak}
                   onClose={() => {
                     setIsGoalManagerOpen(false);
                     setExpandedGoalId(null);
@@ -493,6 +502,9 @@ export default function Home() {
               onFocusGoalChange={setSelectedFocusGoalId}
               dailyMission={dailyMission}
               onMissionChange={setDailyMission}
+              milestonesForFocusGoal={milestonesByGoal[selectedFocusGoalId || ''] || []}
+              selectedMilestoneId={selectedTaskMilestoneId}
+              onMilestoneChange={setSelectedTaskMilestoneId}
               minutes={minutes}
               seconds={seconds}
               timerIsActive={isActive}

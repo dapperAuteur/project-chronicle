@@ -9,6 +9,7 @@ export interface Task {
   notes?: string;
   parentId: string | null;
   deadline?: string;
+  milestoneId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
