@@ -17,7 +17,7 @@ import {
 import { db } from '@/lib/firebase';
 import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
-import { Milestone } from "@/types/milestone";
+// import { Milestone } from "@/types/milestone";
 
 export function useFirestore(user: User | null) {
   const [tasks, setTasks] = useState<Task[]>([]);

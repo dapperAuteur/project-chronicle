@@ -35,8 +35,8 @@ export default function TaskItem({
   level,
 }: TaskItemProps) {
   const containerClasses = `
-    bg-white/10 p-2 rounded-lg flex justify-between items-center cursor-pointer transition-colors
-    ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-white/20'}
+    bg-gray-800/50 p-3 rounded-lg flex flex-col gap-2 border border-gray-700
+    ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-gray-700/50'}
   `;
 
   const handleButtonClick = (e: MouseEvent, action: (id: string) => void) => {
@@ -48,7 +48,7 @@ export default function TaskItem({
     e.stopPropagation();
     if (amount === -1 && task.pomodorosCompleted <= 0) return;
     onAdjustPomodoros(task.id, amount);
-  }
+  };
 
   // const handleIncreasePomos = (e: React.MouseEvent) => {
   //   e.stopPropagation();
@@ -87,13 +87,13 @@ export default function TaskItem({
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (task.status === 'Done') {
-        return { text: `Done`, color: 'text-green-500' };
+        return { text: `✓ Done`, color: 'text-green-500' };
     }
     if (diffDays < 0) {
-      return { text: `Overdue by ${Math.abs(diffDays)} day(s)`, color: 'text-red-500 font-bold' };
+      return { text: `⚠ Overdue by ${Math.abs(diffDays)} day(s)`, color: 'text-red-500 font-bold' };
     }
     if (diffDays === 0) {
-      return { text: 'Due Today', color: 'text-amber-500 font-bold' };
+      return { text: '🔥 Due Today', color: 'text-amber-500 font-bold' };
     }
     if (diffDays <= 7) {
       return { text: `Due in ${diffDays} day(s)`, color: 'text-amber-400' };
@@ -102,6 +102,7 @@ export default function TaskItem({
   };
 
   const deadlineInfo = getDeadlineInfo();
+  const pomodoroProgress = `${task.pomodorosCompleted} / ${task.pomodorosEstimated || '?'}`;
 
   return (
     <div
@@ -109,7 +110,7 @@ export default function TaskItem({
       onClick={() => onClick(task.id)}
       style={{ marginLeft: `${level * 2}rem` }} // NEW: Apply indentation based on level
     >
-      <div className="flex items-center gap-2 flex-grow min-w-0">
+      <div className="flex items-center gap-3 w-full">
         <div className="w-6 flex-shrink-0 text-center">
           {hasChildren && (
             <button onClick={(e) => handleButtonClick(e, onToggleCollapse)}
@@ -127,15 +128,20 @@ export default function TaskItem({
           className="w-5 h-5 rounded accent-blue-500 flex-shrink-0"
         />
         <div className="flex-grow truncate">
-          <p className={`font-bold ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
+          <p className={`font-bold truncate ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
             {task.name}
           </p>
-          {deadlineInfo && (
-            <span className={`text-xs ${deadlineInfo.color}`}>
-              {deadlineInfo.text}
-            </span>
-          )}
-          {task.notes && <p className="text-xs text-gray-400 italic truncate">&quot;{task.notes}&quot;</p>}
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            {deadlineInfo && (
+              <span className={`text-xs ${deadlineInfo.color}`}>
+                {deadlineInfo.text}
+              </span>
+            )}
+            {task.notes && <p className="text-xs text-gray-400 italic truncate">&quot;{task.notes}&quot;</p>}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="font-bold text-lg text-amber-400">{pomodoroProgress} 🍅</span>
+          </div>
         </div>
       </div>
 
