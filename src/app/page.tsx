@@ -671,7 +671,7 @@ export default function Home() {
               onCancelEdit={resetFormState}
             />
               <div className="lg:col-span-1">
-              <h2 className="text-xl font-bold mb-4">Today&quot;s Tasks</h2>
+              <h2 className="text-xl font-bold mb-4">Today&apos;s Tasks</h2>
               <TaskList
                 tasks={tasks}
                 selectedTaskId={selectedTaskId}
@@ -693,6 +693,7 @@ export default function Home() {
                 }
                 />
                 <button
+                  className="text-xs bg-purple-600/50 hover:bg-purple-600 px-2 py-1 rounded-md"
                   onClick={handleTrainModel}>
                   Train Task Estimation Model
                 </button>
