@@ -1,5 +1,5 @@
 import { Task } from '@/types/task';
-import { MouseEvent } from 'react';
+import { ChangeEvent, MouseEvent } from 'react';
 
 interface TaskItemProps {
   task: Task;
@@ -39,7 +39,9 @@ export default function TaskItem({
     ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-gray-700/50'}
   `;
 
-  const handleButtonClick = (e: MouseEvent, action: (id: string) => void) => {
+  const handleButtonClick = (e: ChangeEvent<HTMLInputElement> | MouseEvent<Element, MouseEvent>, action: (id: string) => void) => {
+    // const isChecked = e.target.checked;
+    // const value = e.target.value;
     e.stopPropagation();
     action(task.id);
   };
