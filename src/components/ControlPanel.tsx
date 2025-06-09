@@ -45,6 +45,11 @@ interface ControlPanelProps {
   subtaskParentId: string | null;
   onFormSubmit: (e: FormEvent) => void;
   onCancelEdit: () => void;
+
+  // Pomodoro Estimation Props
+  estimatedPomos: number;
+  onEstimatedPomosChange: (pomos: number) => void;
+  aiPrediction: number | null;
 }
 
 export default function ControlPanel({
@@ -53,7 +58,7 @@ export default function ControlPanel({
   focusDuration, onFocusDurationChange, breakDuration, onBreakDurationChange,
   tasks, taskName, onTaskNameChange, taskCategory, onTaskCategoryChange, taskPriority, onTaskPriorityChange,
   taskNotes, onTaskNotesChange, taskDeadline, onTaskDeadlineChange,
-  editingTaskId, subtaskParentId, onFormSubmit, onCancelEdit
+  editingTaskId, subtaskParentId, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction,
 }: ControlPanelProps) {
   return (
     <div className="lg:col-span-1 space-y-8">
@@ -140,6 +145,31 @@ export default function ControlPanel({
               </select>
             </div>
           )}
+          <div>
+            <label htmlFor="estimated-pomos" className="text-sm text-gray-400">Estimated Pomodoros</label>
+            <div className="flex items-center gap-2">
+              <input
+                id="estimated-pomos"
+                type="number"
+                min="1"
+                value={estimatedPomos}
+                onChange={(e) => onEstimatedPomosChange(Number(e.target.value))}
+                className="w-20 bg-gray-800 p-2 rounded-md border border-gray-700 text-center"
+              />
+              {aiPrediction && !editingTaskId && (
+                <div className="flex items-center gap-2 text-sm text-purple-400">
+                  <span>🤖 AI Suggests: {aiPrediction}</span>
+                  <button
+                    type="button"
+                    onClick={() => onEstimatedPomosChange(aiPrediction)}
+                    className="text-xs bg-purple-600/50 hover:bg-purple-600 px-2 py-1 rounded-md"
+                  >
+                    Use
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <input type="text" placeholder="Category" value={taskCategory} onChange={onTaskCategoryChange} className="bg-gray-800 p-2 rounded-md border border-gray-700" />
           <select value={taskPriority} onChange={(e) => onTaskPriorityChange(e.target.value as 'High' | 'Medium' | 'Low')} className="bg-gray-800 p-2 rounded-md border border-gray-700">
             <option>Low</option><option>Medium</option><option>High</option>

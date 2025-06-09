@@ -10,6 +10,7 @@ export interface Task {
   parentId: string | null;
   deadline?: string;
   milestoneId?: string | null;
+  pomodorosEstimated: number
   createdAt: string;
   updatedAt: string;
 }

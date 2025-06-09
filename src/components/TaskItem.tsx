@@ -15,6 +15,7 @@ interface TaskItemProps {
   onAddSubtask: (parentId: string) => void;
   onToggleCollapse: (id: string) => void;
   level: number;
+  pomodorosEstimated: number;
 }
 
 // Notice how we're using the interface to type the props

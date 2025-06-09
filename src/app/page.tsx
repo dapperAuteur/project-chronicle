@@ -19,6 +19,7 @@ import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useTimer } from '@/hooks/useTimer';
+import { usePrediction } from '@/hooks/usePrediction';
 import { Milestone } from "@/types/milestone";
 
 import Header from '@/components/Header';
@@ -65,6 +66,22 @@ export default function Home() {
   const [taskDeadline, setTaskDeadline] = useState('');
   const [selectedTaskMilestoneId, setSelectedTaskMilestoneId] = useState<string | null>(null);
   const categoryManuallySet = useRef(false);
+  const [estimatedPomos, setEstimatedPomos] = useState(1);
+
+  const { prediction: aiPrediction } = usePrediction({ taskName });
+  const pomosManuallySet = useRef(false);
+
+   useEffect(() => {
+    // If user has not manually set the pomos and there is a prediction
+    if (!pomosManuallySet.current && aiPrediction) {
+      setEstimatedPomos(aiPrediction);
+    }
+  }, [aiPrediction]);
+
+  const handleEstimatedPomosChange = (pomos: number) => {
+    pomosManuallySet.current = true; // Mark as manually changed
+    setEstimatedPomos(pomos);
+  };
 
   const weeklyReportData = useMemo(() => {
     const today = new Date();
@@ -178,6 +195,8 @@ export default function Home() {
     setEditingTaskId(null);
     setSubtaskParentId(null);
     setTaskDeadline('');
+    setEstimatedPomos(1);
+    pomosManuallySet.current = false;
     categoryManuallySet.current = false;
   };
   
@@ -197,7 +216,9 @@ export default function Home() {
       notes: taskNotes,
       updatedAt: now,
       deadline: taskDeadline,
-      // milestoneId: selectedTaskMilestoneId || null,
+      pomodorosCompleted: 0, // NEW: We will now track an estimated vs completed
+      pomodorosEstimated: estimatedPomos,
+      milestoneId: selectedTaskMilestoneId || null, // Is this needed
     };
     if (editingTaskId) {
       await updateTask(editingTaskId, taskData);
@@ -475,6 +496,8 @@ export default function Home() {
       setSelectedTaskMilestoneId(taskToEdit.milestoneId || null);
       setEditingTaskId(taskId);
       setSubtaskParentId(null);
+      setEstimatedPomos(taskToEdit.pomodorosEstimated || 1); // Load the saved estimate
+      pomosManuallySet.current = true;
     }
   };
 
@@ -593,6 +616,9 @@ export default function Home() {
               onTaskDeadlineChange={setTaskDeadline}
               editingTaskId={editingTaskId}
               subtaskParentId={subtaskParentId}
+              estimatedPomos={estimatedPomos}
+              onEstimatedPomosChange={handleEstimatedPomosChange}
+              aiPrediction={aiPrediction}
               onFormSubmit={handleSubmit}
               onCancelEdit={resetFormState}
             />
