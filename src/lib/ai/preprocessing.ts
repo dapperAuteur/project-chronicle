@@ -7,7 +7,7 @@ import { Task } from '@/types/task';
 
 // We convert priority levels into numbers. This is an "ordinal" mapping because
 // 'High' is greater than 'Medium', which is greater than 'Low'.
-const PRIORITY_MAP = {
+export const PRIORITY_MAP = {
   'Low': 0,
   'Medium': 1,
   'High': 2,

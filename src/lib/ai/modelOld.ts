@@ -1,7 +1,8 @@
+// In lib/ai/model.ts
+
 import * as tf from '@tensorflow/tfjs';
 import { Task } from '@/types/task';
-import { tasksToTensor, textToVector, PRIORITY_MAP } from './preprocessing';
-
+import { tasksToTensor } from './preprocessing'; // Import our function from Story 3
 
 const MODEL_STORAGE_PATH = 'localstorage://pomodoro-prediction-model';
 
@@ -99,64 +100,4 @@ export async function trainAndSaveModel(tasks: Task[]): Promise<void> {
   // Clean up tensors to free up memory
   features.dispose();
   labels.dispose();
-}
-
-// --- Add this new function to the end of the file ---
-
-/**
- * Loads a saved model and its metadata to predict the pomodoro count for a new task.
- * @param taskInputs The data for the new task to be predicted.
- * @returns {Promise<number | null>} The predicted number of pomodoros, or null if it fails.
- */
-export async function predictPomos(taskInputs: { name: string, notes: string, category: string, priority: 'High' | 'Medium' | 'Low' }): Promise<number | null> {
-  // 1. Load the saved vocabulary and category map from local storage.
-  const vocabString = localStorage.getItem('pomo-vocabulary');
-  const categoryMapString = localStorage.getItem('pomo-categoryMap');
-
-  if (!vocabString || !categoryMapString) {
-    console.error("Vocabulary or Category Map not found in local storage. Please train the model first.");
-    return null;
-  }
-  
-  const vocabulary = new Map<string, number>(JSON.parse(vocabString));
-  const categoryMap = new Map<string, number>(JSON.parse(categoryMapString));
-
-  let model;
-  try {
-    // 2. Load the saved TensorFlow.js model from local storage.
-    model = await tf.loadLayersModel(MODEL_STORAGE_PATH);
-  } catch (e) {
-    console.error("Could not load the saved model. Please train the model first.", e);
-    return null;
-  }
-
-  // 3. Preprocess the new task's data into a Tensor in the *exact same way* as the training data.
-  const textVector = textToVector(`${taskInputs.name} ${taskInputs.notes}`, vocabulary);
-
-  const categoryVector = Array(categoryMap.size).fill(0);
-  const categoryIndex = categoryMap.get(taskInputs.category);
-  // Handle case where category might be new and not in the map
-  if (categoryIndex !== undefined) {
-      categoryVector[categoryIndex] = 1;
-  }
-
-  const priorityFeature = PRIORITY_MAP[taskInputs.priority]; // We need PRIORITY_MAP to be exported or redefined here
-
-  const inputTensor = tf.tensor2d([[
-    priorityFeature,
-    ...categoryVector,
-    ...textVector
-  ]]);
-
-  // 4. Make the prediction.
-  const prediction = model.predict(inputTensor) as tf.Tensor;
-  const predictionValue = prediction.dataSync()[0];
-
-  // 5. Clean up tensors to free memory. This is very important!
-  model.dispose();
-  inputTensor.dispose();
-  prediction.dispose();
-
-  // Return the prediction, rounded to the nearest whole number.
-  return Math.round(predictionValue);
 }

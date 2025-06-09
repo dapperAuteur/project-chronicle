@@ -16,6 +16,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { trainAndSaveModel, predictPomos } from '@/lib/ai/model';
 import { useAuth } from '@/hooks/useAuth';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useTimer } from '@/hooks/useTimer';
@@ -89,18 +90,51 @@ export default function Home() {
     setIsEstimating(true);
     setAiSuggestion(null);
 
+    try {
+      // Create an object with the current form inputs
+      const taskInputs = {
+        name: taskName,
+        notes: taskNotes,
+        category: taskCategory,
+        priority: taskPriority,
+      };
+
     // This is where the real TensorFlow.js logic will go.
     // For now, we simulate the process.
     console.log("Requesting AI prediction with task name:", taskName);
 
-    // Simulate a 1-second delay
-    setTimeout(() => {
-      const mockPrediction = Math.ceil(Math.random() * 5) + 1; // Random guess from 2-6
-      setAiSuggestion(mockPrediction);
-      setEstimatedPomos(mockPrediction); // Automatically apply the suggestion
+    const prediction = await predictPomos(taskInputs);
+
+    if (prediction !== null) {
+        setAiSuggestion(prediction);
+        setEstimatedPomos(prediction); // Automatically apply the suggestion
+      } else {
+        // Handle case where prediction is not possible (e.g., model not trained)
+        alert("AI model not ready. Please complete at least 10 tasks to train the model.");
+      }
+    } catch (error) {
+      console.error("An error occurred during prediction:", error);
+      alert("An error occurred while trying to get an AI suggestion.");
+    } finally {
       setIsEstimating(false);
-    }, 1000);
+    }
+
+    // // Simulate a 1-second delay
+    // setTimeout(() => {
+    //   const mockPrediction = Math.ceil(Math.random() * 5) + 1; // Random guess from 2-6
+    //   setAiSuggestion(mockPrediction);
+    //   setEstimatedPomos(mockPrediction); // Automatically apply the suggestion
+    //   setIsEstimating(false);
+    // }, 1000);
   };
+
+  const handleTrainModel = async () => {
+      alert("Starting AI model training. This may take a moment and might make the page unresponsive.");
+      // We only want to train on tasks that are 'Done'
+      const completedTasks = tasks.filter(task => task.status === 'Done');
+      await trainAndSaveModel(completedTasks);
+      alert("Model training complete!");
+  }
 
   const weeklyReportData = useMemo(() => {
     const today = new Date();
@@ -658,6 +692,10 @@ export default function Home() {
                   }
                 }
                 />
+                <button
+                  onClick={handleTrainModel}>
+                  Train Task Estimation Model
+                </button>
                 </div>
               </div>
           </>
