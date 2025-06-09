@@ -36,8 +36,8 @@ export default function Home() {
   const { user, loading } = useAuth();
   const { 
     tasks, goals, streak, topStreaks,
-    addTask, updateTask, deleteTask,
-    addGoal, updateGoal, deleteGoal,
+    /* addTask, */ updateTask, deleteTask,
+    addGoal, updateGoal, /* deleteGoal, */
     saveReflection,
   } = useFirestore(user);
 
@@ -419,14 +419,6 @@ export default function Home() {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error signing out: ", error);
-    }
-  };
-
   useEffect(() => {
     if (!user) {
       setSelectedFocusGoalId(null);
@@ -471,18 +463,18 @@ export default function Home() {
     };
   }, [selectedFocusGoalId, dailyMission, user, goals]);
 
-  const handleAdjustPomodoros = async (taskId: string, amount: number) => {
-    if (!user) return;
-    const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
-    const taskToAdjust = tasks.find(t => t.id === taskId);
-    if (taskToAdjust) {
-      const newCount = taskToAdjust.pomodorosCompleted + amount;
-      await updateDoc(taskDocRef, {
-        pomodorosCompleted: newCount >= 0 ? newCount : 0,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  };
+  // const handleAdjustPomodoros = async (taskId: string, amount: number) => {
+  //   if (!user) return;
+  //   const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+  //   const taskToAdjust = tasks.find(t => t.id === taskId);
+  //   if (taskToAdjust) {
+  //     const newCount = taskToAdjust.pomodorosCompleted + amount;
+  //     await updateDoc(taskDocRef, {
+  //       pomodorosCompleted: newCount >= 0 ? newCount : 0,
+  //       updatedAt: new Date().toISOString(),
+  //     });
+  //   }
+  // };
 
   const handleStartEditing = (taskId: string) => {
     const taskToEdit = tasks.find(task => task.id === taskId);
