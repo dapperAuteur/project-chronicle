@@ -39,11 +39,16 @@ export default function TaskItem({
     ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-gray-700/50'}
   `;
 
-  const handleButtonClick = (e: ChangeEvent<HTMLInputElement> | MouseEvent<Element, MouseEvent>, action: (id: string) => void) => {
+  const handleButtonClick = (e: MouseEvent<Element, MouseEvent>, action: (id: string) => void) => {
     // const isChecked = e.target.checked;
     // const value = e.target.value;
     e.stopPropagation();
     action(task.id);
+  };
+
+  const handleCheckboxChange = (e: ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    onToggleStatus(task.id);
   };
 
   const handleAdjustPomosClick = (e: MouseEvent, amount: number) => {
@@ -112,22 +117,23 @@ export default function TaskItem({
       onClick={() => onClick(task.id)}
       style={{ marginLeft: `${level * 2}rem` }} // NEW: Apply indentation based on level
     >
-      <div className="flex items-center gap-3 w-full">
-        <div className="w-6 flex-shrink-0 text-center">
-          {hasChildren && (
+      <div className="flex items-start gap-3 w-full">
+        <div className="w-6 flex-shrink-0 pt-1">
+          {hasChildren ? (
             <button onClick={(e) => handleButtonClick(e, onToggleCollapse)}
-              className="text-gray-400 hover:text-white text-lg"
+              className="text-gray-400 hover:text-white text-lg w-6 text-center"
               aria-label={isCollapsed ? 'Expand task' : 'Collapse task'}>
                 {isCollapsed ? '▶' : '▼'}
             </button>
-            )
+            ) : <div className="w-6"></div>
           }
         </div>
         <input
           type="checkbox"
           checked={task.status === 'Done'}
-          onChange={(e) => handleButtonClick(e, onToggleStatus)}
-          className="w-5 h-5 rounded accent-blue-500 flex-shrink-0"
+          onChange={(e) => handleCheckboxChange}
+          onClick={(e) => e.stopPropagation()}
+          className="w-5 h-5 mt-1 rounded accent-blue-500 flex-shrink-0"
         />
         <div className="flex-grow truncate">
           <p className={`font-bold truncate ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>
