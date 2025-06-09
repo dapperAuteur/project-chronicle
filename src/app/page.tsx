@@ -32,7 +32,12 @@ import TaskList from '@/components/TaskList';
 export default function Home() {
 
   const { user, loading } = useAuth();
-  const { tasks, goals, streak, topStreaks } = useFirestore(user);
+  const { 
+    tasks, goals, streak, topStreaks,
+    addTask, updateTask, deleteTask,
+    addGoal, updateGoal, deleteGoal,
+    saveReflection,
+  } = useFirestore(user);
 
   const [milestonesByGoal, setMilestonesByGoal] = useState<Record<string, Milestone[]>>({});
   const [currentMilestones, setCurrentMilestones] = useState<Milestone[]>([]);
@@ -61,10 +66,9 @@ export default function Home() {
 
   const handleSessionComplete = (completedMode: 'focus' | 'break') => {
     if (completedMode === 'focus' && selectedTaskId && user) {
-      const taskDocRef = doc(db, 'users', user.uid, 'tasks', selectedTaskId);
       const task = tasks.find(t => t.id === selectedTaskId);
       if (task) {
-        updateDoc(taskDocRef, { 
+        updateTask(selectedTaskId, { 
           pomodorosCompleted: task.pomodorosCompleted + 1,
           updatedAt: new Date().toISOString()
         });
@@ -139,11 +143,11 @@ export default function Home() {
       priority: taskPriority,
       notes: taskNotes,
       updatedAt: now,
-      deadline: taskDeadline || null ,
-      milestoneId: selectedTaskMilestoneId || null,
+      deadline: taskDeadline,
+      // milestoneId: selectedTaskMilestoneId || null,
     };
     if (editingTaskId) {
-      await updateDoc(doc(db, 'users', user.uid, 'tasks', editingTaskId), taskData);
+      await updateTask(editingTaskId, taskData);
     } else {
       await addDoc(collection(db, 'users', user.uid, 'tasks'), {
         ...taskData,
@@ -165,15 +169,13 @@ export default function Home() {
 
   const handleGoalSave = async (goalName: string, deadline: string, goalId?: string) => {
     if (!user) return;
-    const goalsCollectionRef = collection(db, 'users', user.uid, 'goals');
 
-    const data = { name: goalName, deadline: deadline || null };
+    const goalData = { name: goalName, deadline: deadline };
 
-    if (goalId) { // Editing existing goal
-      const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
-      await updateDoc(goalDocRef, data);
+    if (goalId) {
+      await updateGoal(goalId, goalData);
     } else { // Adding new goal
-      await addDoc(goalsCollectionRef, data);
+      await addGoal(goalData);
     }
   };
 
@@ -285,7 +287,7 @@ export default function Home() {
 
       const data = await response.json();
 
-      await handleSaveReflection(data.summary);
+      await saveReflection(data.summary, todayStr);
       
       // 4. Update the reflection text with the AI's summary.
       setReflectionText(data.summary);
@@ -424,12 +426,10 @@ export default function Home() {
   };
 
   const handleToggleStatus = async (taskId: string) => {
-    if (!user) return;
-    const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
-    const taskToToggle = tasks.find(t => t.id === taskId);
-    if (taskToToggle) {
-      await updateDoc(taskDocRef, {
-        status: taskToToggle.status === 'Done' ? 'To Do' : 'Done',
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      await updateTask(taskId, {
+        status: task.status === 'Done' ? 'To Do' : 'Done',
         updatedAt: new Date().toISOString(),
       });
     }
@@ -437,8 +437,7 @@ export default function Home() {
   const handleDeleteTask = async (taskId: string) => {
     if (!user) return;
     if (window.confirm("Are you sure you want to delete this task?")) {
-      const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
-      await deleteDoc(taskDocRef);
+      await deleteTask(taskId);
     }
   };
 
@@ -455,7 +454,7 @@ export default function Home() {
             streak={streak}
             onOpenGoalManager={() => setIsGoalManagerOpen(true)}
             onOpenProfile={() => setIsProfileOpen(true)}
-            onSignOut={handleSignOut}
+            onSignOut={() => signOut(auth)}
           />
             {
               isGoalManagerOpen && (
@@ -541,7 +540,16 @@ export default function Home() {
                 onDelete={handleDeleteTask}
                 onToggleStatus={handleToggleStatus}
                 onEdit={handleStartEditing}
-                onAdjustPomodoros={handleAdjustPomodoros}
+                onAdjustPomodoros={
+                  (taskId, amount) => {
+                    const task = tasks.find(t => t.id === taskId);
+                    if(task) updateTask(
+                      taskId, {
+                        pomodorosCompleted: Math.max(0, task.pomodorosCompleted + amount)
+                      }
+                    )
+                  }
+                }
                 />
                 </div>
               </div>
