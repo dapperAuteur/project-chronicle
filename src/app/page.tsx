@@ -1,6 +1,6 @@
  "use client";
 
-import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
+import { useMemo, useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { signOut } from 'firebase/auth';
 import {
   collection,
@@ -28,6 +28,7 @@ import GoalManager from "@/components/GoalManager";
 import DailyReflection from '@/components/DailyReflection';
 import ControlPanel from '@/components/ControlPanel';
 import TaskList from '@/components/TaskList';
+import ProgressReport from '@/components/ProgressReport';
 
 export default function Home() {
 
@@ -46,6 +47,7 @@ export default function Home() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isGoalManagerOpen, setIsGoalManagerOpen] = useState(false);
   const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedFocusGoalId, setSelectedFocusGoalId] = useState<string | null>(null);
@@ -63,6 +65,57 @@ export default function Home() {
   const [taskDeadline, setTaskDeadline] = useState('');
   const [selectedTaskMilestoneId, setSelectedTaskMilestoneId] = useState<string | null>(null);
   const categoryManuallySet = useRef(false);
+
+  const weeklyReportData = useMemo(() => {
+    const today = new Date();
+    const last7Days = new Date();
+    last7Days.setDate(today.getDate() - 7);
+
+    const recentTasks = tasks.filter(task => new Date(task.updatedAt) >= last7Days);
+    
+    // 1. Total Pomodoros
+    const totalPomos = recentTasks.reduce((sum, task) => sum + task.pomodorosCompleted, 0);
+
+    // 2. Category Breakdown
+    const pomosByCategory = recentTasks.reduce((acc, task) => {
+      const category = task.category || 'Uncategorized';
+      acc[category] = (acc[category] || 0) + task.pomodorosCompleted;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // 3. Daily Breakdown
+    const pomosByDay: Record<string, number> = {};
+    for (let i = 0; i < 7; i++) {
+        const day = new Date();
+        day.setDate(today.getDate() - i);
+        const dayString = day.toLocaleDateString('en-US', { weekday: 'short' });
+        pomosByDay[dayString] = 0;
+    }
+    recentTasks.forEach(task => {
+        const dayString = new Date(task.updatedAt).toLocaleDateString('en-US', { weekday: 'short' });
+        if(pomosByDay[dayString] !== undefined) {
+            pomosByDay[dayString] += task.pomodorosCompleted;
+        }
+    });
+
+    const dailyPomosData = {
+        labels: Object.keys(pomosByDay).reverse(),
+        data: Object.values(pomosByDay).reverse(),
+    };
+    
+    // 4. Most Productive Day
+    const mostProductiveDay = Object.entries(pomosByDay).reduce((max, entry) => entry[1] > max[1] ? entry : max, ['', 0])[0] || 'N/A';
+    
+    return {
+      totalPomos,
+      mostProductiveDay,
+      categoryData: {
+        labels: Object.keys(pomosByCategory),
+        data: Object.values(pomosByCategory),
+      },
+      dailyPomosData,
+    };
+  }, [tasks]);
 
   const handleSessionComplete = (completedMode: 'focus' | 'break') => {
     if (completedMode === 'focus' && selectedTaskId && user) {
@@ -452,6 +505,7 @@ export default function Home() {
           <Header
             user={user}
             streak={streak}
+            onOpenReport={() => setIsReportOpen(true)}
             onOpenGoalManager={() => setIsGoalManagerOpen(true)}
             onOpenProfile={() => setIsProfileOpen(true)}
             onSignOut={() => signOut(auth)}
@@ -480,9 +534,14 @@ export default function Home() {
                 />
               )
             }
-            {isProfileOpen && user && (
-            <UserProfile user={user} topStreaks={topStreaks} onClose={() => setIsProfileOpen(false)} />
-          )}
+            {
+              isProfileOpen && user && (
+                <UserProfile
+                  user={user}
+                  topStreaks={topStreaks}
+                  onClose={() => setIsProfileOpen(false)} />
+              )
+            }
             {
               isReflectionOpen && (
                 <DailyReflection
@@ -491,6 +550,14 @@ export default function Home() {
                   onSave={handleSaveReflection}
                   onDraft={handleDraftReflection}
                   onClose={() => setIsReflectionOpen(false)}
+                />
+              )
+            }
+            {
+              isReportOpen && (
+                <ProgressReport 
+                  data={weeklyReportData}
+                  onClose={() => setIsReportOpen(false)}
                 />
               )
             }
