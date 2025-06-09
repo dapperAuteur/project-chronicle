@@ -11,6 +11,7 @@
   "dependencies": {
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
     "@google/generative-ai": "^0.24.1",
+    "@tensorflow/tfjs": "^4.22.0",
     "@vercel/analytics": "^1.5.0",
     "chart.js": "^4.4.9",
     "firebase": "^11.9.0",

@@ -131,7 +131,7 @@ export default function TaskItem({
         <input
           type="checkbox"
           checked={task.status === 'Done'}
-          onChange={(e) => handleCheckboxChange}
+          onChange={handleCheckboxChange}
           onClick={(e) => e.stopPropagation()}
           className="w-5 h-5 mt-1 rounded accent-blue-500 flex-shrink-0"
         />
