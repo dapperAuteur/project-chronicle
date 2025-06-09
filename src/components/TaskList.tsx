@@ -68,6 +68,7 @@ export default function TaskList({
             onDelete={onDelete}
             onEdit={onEdit}
             onAdjustPomodoros={onAdjustPomodoros}
+            pomodorosEstimated={task.pomodorosEstimated}
             onClick={onTaskClick}
             onAddSubtask={onAddSubtask}
             onToggleCollapse={handleToggleCollapse}
