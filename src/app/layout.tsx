@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chronicle AI: Todo WitUS.Online",
+  title: "Chronicle AI: Todo.WitUS.Online",
   description: "Chronicle AI: The Mindful Achievement System",
 };
 
