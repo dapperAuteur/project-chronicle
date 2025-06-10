@@ -604,6 +604,7 @@ export default function Home() {
             onOpenReport={() => setIsReportOpen(true)}
             onOpenGoalManager={() => setIsGoalManagerOpen(true)}
             onOpenProfile={() => setIsProfileOpen(true)}
+            onOpenReflection={() => setIsReflectionOpen(true)}
             onSignOut={() => signOut(auth)}
           />
             {

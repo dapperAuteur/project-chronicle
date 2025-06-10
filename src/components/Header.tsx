@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenGoalManager: () => void;
   onOpenProfile: () => void;
   onOpenReport: () => void;
+  onOpenReflection: () => void;
   onSignOut: () => void;
 }
 
@@ -18,6 +19,7 @@ export default function Header({
   onOpenReport,
   onOpenGoalManager,
   onOpenProfile,
+  onOpenReflection,
   onSignOut,
 }: HeaderProps) {
   return (
@@ -31,6 +33,9 @@ export default function Header({
             <div className="flex gap-2 sm:gap-4">
               <button onClick={onOpenGoalManager} className="bg-purple-600 hover:bg-purple-700 p-2 rounded-md font-bold text-white text-sm sm:text-base">
                🏆 Goals
+              </button>
+              <button onClick={onOpenReflection} className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold text-white text-sm sm:text-base">
+               🤔 Daily Reflection
               </button>
               <button onClick={onOpenReport} className="bg-green-600 hover:bg-green-700 p-2 rounded-md font-bold text-white text-sm sm:text-base">
                📈 Report
