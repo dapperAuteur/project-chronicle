@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Goal } from '@/types/goal';
 import { Milestone } from '@/types/milestone';
 
@@ -61,6 +61,8 @@ export default function GoalManager({
   const [newGoalDeadline, setNewGoalDeadline] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+
   // Filter goals into active and archived lists
   const activeGoals = goals.filter(g => !g.isArchived);
   const archivedGoals = goals.filter(g => g.isArchived);
@@ -73,24 +75,33 @@ export default function GoalManager({
     }
   };
 
-  const handleNewGoalSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newGoalName.trim()) {
-      onGoalSave(newGoalName, newGoalDeadline);
+      onGoalSave(newGoalName, newGoalDeadline, editingGoal?.id);
+      setNewGoalName('');
+      setNewGoalDeadline('');
+      setEditingGoal(null);
+    }
+  };
+  useEffect(() => {
+    if (editingGoal) {
+      setNewGoalName(editingGoal.name);
+      setNewGoalDeadline(editingGoal.deadline || '');
+    } else {
+      // Clear form when not editing
       setNewGoalName('');
       setNewGoalDeadline('');
     }
-  };
-  console.log('archivedGoals :>> ', archivedGoals);
-  console.log('activeGoals :>> ', activeGoals);
+  }, [editingGoal]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl border border-gray-700">
         <h2 className="text-2xl font-bold mb-4">Active Goals & Milestones</h2>
 
-        <form onSubmit={handleNewGoalSubmit} className="mb-6">
-          <h3 className="font-bold text-lg mb-2">Add New Goal</h3>
+        <form onSubmit={handleFormSubmit} className="mb-6">
+          <h3 className="font-bold text-lg mb-2">{editingGoal ? 'Edit Goal' : 'Add New Goal'}</h3>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -111,8 +122,17 @@ export default function GoalManager({
               type="submit"
               className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold"
             >
-              Save Goal
+              {editingGoal ? 'Update Goal' : 'Save Goal'}
             </button>
+            {editingGoal && (
+              <button
+                type="button"
+                onClick={() => setEditingGoal(null)} // Clears the form
+                className="bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold"
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </form>
         
@@ -126,8 +146,16 @@ export default function GoalManager({
                   <p className="font-bold">{goal.name}</p>
                   {goal.deadline && <p className="text-xs text-amber-400">Goal Due: {goal.deadline}</p>}
                 </div>
-                <button onClick={() => onGoalArchive(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Archive Goal">🗄️</button>
-                <button onClick={() => onGoalDelete(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Delete Goal">🗑️</button>
+                <button onClick={() => onGoalArchive(goal.id)} className="text-xl ml-2 p-1 hover:bg-white/20 rounded" title="Archive Goal">
+                  🗄️
+                </button>
+                <button onClick={() => onGoalDelete(goal.id)} className="text-xl ml-2 p-1 hover:bg-white/20 rounded" title="Delete Goal">
+                  🗑️
+                </button>
+                <button onClick={() => setEditingGoal(goal)} className="text-xl ml-2 p-1 hover:bg-white/20 rounded" title="Edit Goal">
+                  ✏️
+                </button>
+              
             
               </div>
 
@@ -188,7 +216,7 @@ export default function GoalManager({
                             console.log('goal.id :>> ', goal.id);
                             onGoalUnarchive(goal.id)
 
-                          }} className="text-sm p-1 hover:bg-white/20 rounded" title="Unarchive Goal">🗄️</button>
+                          }} className="text-xl p-1 hover:bg-white/20 rounded" title="Unarchive Goal">🗄️</button>
                         </div>
                       ))}
                     </div>
