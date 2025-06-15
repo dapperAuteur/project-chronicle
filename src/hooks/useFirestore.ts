@@ -85,7 +85,8 @@ export function useFirestore(user: User | null) {
   };
   const deleteGoal = async (goalId: string) => {
     if (!user) return;
-    await deleteDoc(doc(db, 'users', user.uid, 'goals', goalId));
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await deleteDoc(goalDocRef);
   };
   const saveReflection = async (reflectionText: string, todayStr: string) => {
     if (!user) return;
