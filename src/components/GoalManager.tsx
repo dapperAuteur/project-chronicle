@@ -111,7 +111,7 @@ export default function GoalManager({
                         <div key={goal.id} className="bg-gray-800 p-3 rounded-md flex justify-between items-center text-gray-500">
                           <span className="line-through">{goal.name}</span>
                           {/* Optionally add an "Unarchive" button here in the future */}
-                          <button onClick={() => onGoalArchive(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Archive Goal">🗄️</button>
+                          <button onClick={() => onGoalUnarchive(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Unarchive Goal">🗄️</button>
                         </div>
                       ))}
                     </div>
