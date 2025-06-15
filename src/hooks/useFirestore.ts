@@ -93,7 +93,7 @@ export function useFirestore(user: User | null) {
     const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
     await updateDoc(goalDocRef, { isArchived: true });
   };
-  const unarchiveGoal = async (goalId: string) => {
+  const unarchiveGoal = async (goalId: string) => {console.log('goalId :>> ', goalId);
     if (!user) return;
     const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
     await updateDoc(goalDocRef, { isArchived: false });

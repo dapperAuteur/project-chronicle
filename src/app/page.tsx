@@ -38,7 +38,7 @@ export default function Home() {
   const { 
     tasks, goals, streak, topStreaks,
     /* addTask, */ updateTask, deleteTask,
-    addGoal, updateGoal, deleteGoal, archiveGoal,
+    addGoal, updateGoal, deleteGoal, archiveGoal, unarchiveGoal,
     saveReflection,
   } = useFirestore(user);
 
@@ -74,13 +74,6 @@ export default function Home() {
   const pomosManuallySet = useRef(false);
   const [aiSuggestion, setAiSuggestion] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
-
-  //  useEffect(() => {
-  //   // If user has not manually set the pomos and there is a prediction
-  //   if (!pomosManuallySet.current && aiPrediction) {
-  //     setEstimatedPomos(aiPrediction);
-  //   }
-  // }, [aiPrediction]);
 
   const handleEstimatedPomosChange = (pomos: number) => {
     pomosManuallySet.current = true; // Mark as manually changed
@@ -119,14 +112,6 @@ export default function Home() {
     } finally {
       setIsEstimating(false);
     }
-
-    // // Simulate a 1-second delay
-    // setTimeout(() => {
-    //   const mockPrediction = Math.ceil(Math.random() * 5) + 1; // Random guess from 2-6
-    //   setAiSuggestion(mockPrediction);
-    //   setEstimatedPomos(mockPrediction); // Automatically apply the suggestion
-    //   setIsEstimating(false);
-    // }, 1000);
   };
 
   const handleTrainModel = async () => {
@@ -234,6 +219,7 @@ export default function Home() {
       });
       unsubscribers.push(unsubscribe);
     });
+
     return () => unsubscribers.forEach(unsub => unsub());
   }, [user, goals]);
 
@@ -325,8 +311,9 @@ export default function Home() {
   };
 
   const handleUnarchiveGoal = async (goalId: string) => {
+    console.log('goalId :>> ', goalId);
     if (!user) return;
-    await archiveGoal(goalId);
+    await unarchiveGoal(goalId);
   }
 
   const handleSaveReflection = async (newReflectionText: string) => {

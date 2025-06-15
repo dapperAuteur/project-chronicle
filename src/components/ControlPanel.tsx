@@ -71,6 +71,7 @@ export default function ControlPanel({
   taskParentId,
   onTaskParentChange, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction, aiSuggestion, isEstimating, onGetAiEstimate,
 }: ControlPanelProps) {
+  const activeGoals = goals.filter(g => !g.isArchived);
 
   const getTaskDepth = (taskId: string, tasksById: Map<string, Task>, depth = 0): number => {
     const task = tasksById.get(taskId);
@@ -97,7 +98,7 @@ export default function ControlPanel({
               className="w-full p-3 rounded-md text-lg bg-gray-800 border border-gray-700"
             >
               <option value="" disabled>-- Select a Goal --</option>
-              {goals.map(goal => (
+              {activeGoals.map(goal => (
                 <option key={goal.id} value={goal.id}>{goal.name}</option>
               ))}
             </select>

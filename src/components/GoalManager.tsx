@@ -45,6 +45,7 @@ export default function GoalManager({
   activeGoalMilestones,
   progressByGoal,
   expandedGoalId,
+  onGoalSave,
   onGoalDelete,
   onGoalArchive,
   onGoalUnarchive,
@@ -56,6 +57,8 @@ export default function GoalManager({
 }: GoalManagerProps) {
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [newMilestoneDeadline, setNewMilestoneDeadline] = useState('');
+  const [newGoalName, setNewGoalName] = useState('');
+  const [newGoalDeadline, setNewGoalDeadline] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
   // Filter goals into active and archived lists
@@ -70,10 +73,48 @@ export default function GoalManager({
     }
   };
 
+  const handleNewGoalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newGoalName.trim()) {
+      onGoalSave(newGoalName, newGoalDeadline);
+      setNewGoalName('');
+      setNewGoalDeadline('');
+    }
+  };
+  console.log('archivedGoals :>> ', archivedGoals);
+  console.log('activeGoals :>> ', activeGoals);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl border border-gray-700">
         <h2 className="text-2xl font-bold mb-4">Active Goals & Milestones</h2>
+
+        <form onSubmit={handleNewGoalSubmit} className="mb-6">
+          <h3 className="font-bold text-lg mb-2">Add New Goal</h3>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="New Goal Name"
+              className="flex-grow bg-gray-800 p-2 rounded-md border border-gray-700"
+              // 5. CONNECT the input to state
+              value={newGoalName}
+              onChange={(e) => setNewGoalName(e.target.value)}
+            />
+            <input
+              type="date"
+              className="bg-gray-800 p-2 rounded-md border border-gray-700"
+              // 6. CONNECT the input to state
+              value={newGoalDeadline}
+              onChange={(e) => setNewGoalDeadline(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md font-bold"
+            >
+              Save Goal
+            </button>
+          </div>
+        </form>
         
         <div className="space-y-2 mb-4 max-h-[60vh] overflow-y-auto">
           {activeGoals.map(goal => {
@@ -99,25 +140,6 @@ export default function GoalManager({
                   <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
                 </div>
               </div>
-
-              {archivedGoals.length > 0 && (
-                <div className="mt-6">
-                  <button onClick={() => setShowArchived(!showArchived)} className="text-sm text-gray-400 hover:text-white">
-                    {showArchived ? '▼ Hide' : '▶ Show'} {archivedGoals.length} Archived Goal(s)
-                  </button>
-                  {showArchived && (
-                    <div className="mt-2 space-y-2">
-                      {archivedGoals.map(goal => (
-                        <div key={goal.id} className="bg-gray-800 p-3 rounded-md flex justify-between items-center text-gray-500">
-                          <span className="line-through">{goal.name}</span>
-                          {/* Optionally add an "Unarchive" button here in the future */}
-                          <button onClick={() => onGoalUnarchive(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Unarchive Goal">🗄️</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Expanded View for Milestones */}
               {expandedGoalId === goal.id && (
@@ -146,9 +168,34 @@ export default function GoalManager({
                   </div>
                 </div>
               )}
+              
             </div>
           )
           })}
+          <div>
+            {archivedGoals.length > 0 && (
+                <div className="mt-6">
+                  <button onClick={() => setShowArchived(!showArchived)} className="text-sm text-gray-400 hover:text-white">
+                    {showArchived ? '▼ Hide' : '▶ Show'} {archivedGoals.length} Archived Goal(s)
+                  </button>
+                  {showArchived && (
+                    <div className="mt-2 space-y-2">
+                      {archivedGoals.map(goal => (
+                        <div key={goal.id} className="bg-gray-700 space-y-2 mb-4 max-h-[60vh] overflow-y-auto p-3 rounded-md flex justify-between items-center text-gray-400">
+                          <span className="line-through">{goal.name}</span>
+                          {/* Optionally add an "Unarchive" button here in the future */}
+                          <button onClick={() =>{
+                            console.log('goal.id :>> ', goal.id);
+                            onGoalUnarchive(goal.id)
+
+                          }} className="text-sm p-1 hover:bg-white/20 rounded" title="Unarchive Goal">🗄️</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+          </div>
         </div>
         
         <button onClick={onClose} className="mt-4 w-full bg-gray-600 hover:bg-gray-700 p-2 rounded-md font-bold">Close</button>
