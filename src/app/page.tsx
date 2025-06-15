@@ -38,7 +38,7 @@ export default function Home() {
   const { 
     tasks, goals, streak, topStreaks,
     /* addTask, */ updateTask, deleteTask,
-    addGoal, updateGoal, /* deleteGoal, */
+    addGoal, updateGoal, deleteGoal, archiveGoal,
     saveReflection,
   } = useFirestore(user);
 
@@ -312,8 +312,22 @@ export default function Home() {
   const handleDeleteGoal = async (goalId: string) => {
     if (!user) return;
     const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
-    await deleteDoc(goalDocRef);
+    if (window.confirm("Are you sure you want to delete this goal?")) {
+      await deleteDoc(goalDocRef)
+    }
+  }
+
+  const handleArchiveGoal = async (goalId: string) => {
+      if (!user) return;
+      if (window.confirm("Are you sure you want to archive this goal?")) {
+          await archiveGoal(goalId);
+      }
   };
+
+  const handleUnarchiveGoal = async (goalId: string) => {
+    if (!user) return;
+    await archiveGoal(goalId);
+  }
 
   const handleSaveReflection = async (newReflectionText: string) => {
     if (!user) return;
@@ -620,6 +634,8 @@ export default function Home() {
                   expandedGoalId={expandedGoalId}
                   onGoalSave={handleGoalSave}
                   onGoalDelete={handleDeleteGoal}
+                  onGoalArchive={handleArchiveGoal}
+                  onGoalUnarchive={handleUnarchiveGoal}
                   onMilestoneSave={handleSaveMilestone}
                   onMilestoneToggle={handleToggleMilestoneStatus}
                   onMilestoneDelete={handleDeleteMilestone}

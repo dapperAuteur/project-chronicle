@@ -31,6 +31,8 @@ interface GoalManagerProps {
   expandedGoalId: string | null;
   onGoalSave: (goalName: string, deadline: string, goalId?: string) => void;
   onGoalDelete: (goalId: string) => void;
+  onGoalArchive: (goalId: string) => void;
+  onGoalUnarchive: (goalId: string) => void;
   onMilestoneSave: (milestoneName: string, deadline: string, goalId: string) => void;
   onMilestoneToggle: (milestoneId: string, currentStatus: 'To Do' | 'Complete') => void;
   onMilestoneDelete: (milestoneId: string) => void;
@@ -44,6 +46,8 @@ export default function GoalManager({
   progressByGoal,
   expandedGoalId,
   onGoalDelete,
+  onGoalArchive,
+  onGoalUnarchive,
   onMilestoneSave,
   onMilestoneToggle,
   onMilestoneDelete,
@@ -52,6 +56,11 @@ export default function GoalManager({
 }: GoalManagerProps) {
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [newMilestoneDeadline, setNewMilestoneDeadline] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Filter goals into active and archived lists
+  const activeGoals = goals.filter(g => !g.isArchived);
+  const archivedGoals = goals.filter(g => g.isArchived);
 
   const handleMilestoneSave = (goalId: string) => {
     if (newMilestoneName.trim()) {
@@ -64,10 +73,10 @@ export default function GoalManager({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl border border-gray-700">
-        <h2 className="text-2xl font-bold mb-4">Goals & Milestones</h2>
+        <h2 className="text-2xl font-bold mb-4">Active Goals & Milestones</h2>
         
         <div className="space-y-2 mb-4 max-h-[60vh] overflow-y-auto">
-          {goals.map(goal => {
+          {activeGoals.map(goal => {
             const progress = progressByGoal[goal.id] || 0;
             return (
             <div key={goal.id} className="bg-white/10 p-3 rounded">
@@ -76,7 +85,9 @@ export default function GoalManager({
                   <p className="font-bold">{goal.name}</p>
                   {goal.deadline && <p className="text-xs text-amber-400">Goal Due: {goal.deadline}</p>}
                 </div>
-                <button onClick={() => onGoalDelete(goal.id)} className="text-red-500 text-sm">Delete Goal</button>
+                <button onClick={() => onGoalArchive(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Archive Goal">🗄️</button>
+                <button onClick={() => onGoalDelete(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Delete Goal">🗑️</button>
+            
               </div>
 
               <div className="mt-3">
@@ -88,6 +99,25 @@ export default function GoalManager({
                   <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
                 </div>
               </div>
+
+              {archivedGoals.length > 0 && (
+                <div className="mt-6">
+                  <button onClick={() => setShowArchived(!showArchived)} className="text-sm text-gray-400 hover:text-white">
+                    {showArchived ? '▼ Hide' : '▶ Show'} {archivedGoals.length} Archived Goal(s)
+                  </button>
+                  {showArchived && (
+                    <div className="mt-2 space-y-2">
+                      {archivedGoals.map(goal => (
+                        <div key={goal.id} className="bg-gray-800 p-3 rounded-md flex justify-between items-center text-gray-500">
+                          <span className="line-through">{goal.name}</span>
+                          {/* Optionally add an "Unarchive" button here in the future */}
+                          <button onClick={() => onGoalArchive(goal.id)} className="text-sm p-1 hover:bg-white/20 rounded" title="Archive Goal">🗄️</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Expanded View for Milestones */}
               {expandedGoalId === goal.id && (

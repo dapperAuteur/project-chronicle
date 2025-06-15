@@ -88,6 +88,16 @@ export function useFirestore(user: User | null) {
     const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
     await deleteDoc(goalDocRef);
   };
+  const archiveGoal = async (goalId: string) => {
+    if (!user) return;
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await updateDoc(goalDocRef, { isArchived: true });
+  };
+  const unarchiveGoal = async (goalId: string) => {
+    if (!user) return;
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await updateDoc(goalDocRef, { isArchived: false });
+  };
   const saveReflection = async (reflectionText: string, todayStr: string) => {
     if (!user) return;
     const statsDocRef = doc(db, 'users', user.uid, 'stats', 'user_stats');
@@ -103,6 +113,6 @@ export function useFirestore(user: User | null) {
     tasks, goals, streak, topStreaks,
     addTask, updateTask, deleteTask,
     addGoal, updateGoal, deleteGoal,
-    saveReflection,
+    saveReflection, archiveGoal, unarchiveGoal,
   };
 }
