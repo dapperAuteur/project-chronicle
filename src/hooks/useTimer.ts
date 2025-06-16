@@ -32,7 +32,7 @@ export function useTimer({
     
     setMode(nextMode);
     setSecondsLeft(nextDurationInSeconds);
-    setIsActive(false); // Pause timer on mode switch
+    setIsActive(true); // Pause timer on mode switch
   }, [mode, focusDuration, breakDuration, onSessionComplete]);
 
   // This function now just clears the interval

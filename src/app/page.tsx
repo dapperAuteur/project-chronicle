@@ -18,6 +18,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { trainAndSaveModel, predictPomos } from '@/lib/ai/model';
 import { useAuth } from '@/hooks/useAuth';
+import { useAudio } from '@/hooks/useAudio';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useTimer } from '@/hooks/useTimer';
 import { usePrediction } from '@/hooks/usePrediction';
@@ -74,6 +75,8 @@ export default function Home() {
   const pomosManuallySet = useRef(false);
   const [aiSuggestion, setAiSuggestion] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const playAlarm = useAudio('./beat_my_hi_score.wav');
+
 
   const handleEstimatedPomosChange = (pomos: number) => {
     pomosManuallySet.current = true; // Mark as manually changed
@@ -174,6 +177,7 @@ export default function Home() {
   }, [tasks]);
 
   const handleSessionComplete = (completedMode: 'focus' | 'break') => {
+    playAlarm();
     if (completedMode === 'focus' && selectedTaskId && user) {
       const task = tasks.find(t => t.id === selectedTaskId);
       if (task) {
