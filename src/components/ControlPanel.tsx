@@ -31,6 +31,7 @@ interface ControlPanelProps {
   onBreakDurationChange: (duration: number) => void;
 
   // Form Props
+  selectedTaskId: string | null;
   tasks: Task[];
   taskName: string;
   onTaskNameChange: (name: string) => void;
@@ -69,8 +70,9 @@ export default function ControlPanel({
   taskNotes, onTaskNotesChange, taskDeadline, onTaskDeadlineChange,
   editingTaskId, subtaskParentId, potentialParentTasks,
   taskParentId,
-  onTaskParentChange, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction, aiSuggestion, isEstimating, onGetAiEstimate,
+  onTaskParentChange, onFormSubmit, onCancelEdit,estimatedPomos, onEstimatedPomosChange, aiPrediction, aiSuggestion, isEstimating, onGetAiEstimate, selectedTaskId,
 }: ControlPanelProps) {
+  const activeGoals = goals.filter(g => !g.isArchived);
 
   const getTaskDepth = (taskId: string, tasksById: Map<string, Task>, depth = 0): number => {
     const task = tasksById.get(taskId);
@@ -80,6 +82,7 @@ export default function ControlPanel({
     return depth;
   };
   const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const selectedTask = tasks.find(task => task.id === selectedTaskId);
   return (
     <div className="lg:col-span-1 space-y-8">
       {/* Daily Focus */}
@@ -97,7 +100,7 @@ export default function ControlPanel({
               className="w-full p-3 rounded-md text-lg bg-gray-800 border border-gray-700"
             >
               <option value="" disabled>-- Select a Goal --</option>
-              {goals.map(goal => (
+              {activeGoals.map(goal => (
                 <option key={goal.id} value={goal.id}>{goal.name}</option>
               ))}
             </select>
@@ -120,7 +123,9 @@ export default function ControlPanel({
       
       {/* Pomodoro Timer */}
       <div className="w-full">
-        <h2 className="text-xl font-bold mb-2 text-white">Pomodoro Timer</h2>
+        <h2 className="text-xl font-bold mb-2 text-white">Pomodoro Timer
+          {selectedTask ? <span className="text-blue-400">: {selectedTask.name}</span> : ''}
+        </h2>
         <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
           <div className="flex justify-center gap-4 mb-4 text-center">
             <div>

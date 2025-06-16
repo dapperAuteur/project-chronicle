@@ -18,6 +18,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { trainAndSaveModel, predictPomos } from '@/lib/ai/model';
 import { useAuth } from '@/hooks/useAuth';
+import { useAudio } from '@/hooks/useAudio';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useTimer } from '@/hooks/useTimer';
 import { usePrediction } from '@/hooks/usePrediction';
@@ -38,8 +39,8 @@ export default function Home() {
   const { 
     tasks, goals, streak, topStreaks,
     /* addTask, */ updateTask, deleteTask,
-    addGoal, updateGoal, /* deleteGoal, */
-    saveReflection,
+    addGoal, updateGoal, deleteGoal, archiveGoal, unarchiveGoal,
+    saveReflection, moveMilestone, updateMilestone,
   } = useFirestore(user);
 
   const [milestonesByGoal, setMilestonesByGoal] = useState<Record<string, Milestone[]>>({});
@@ -74,13 +75,8 @@ export default function Home() {
   const pomosManuallySet = useRef(false);
   const [aiSuggestion, setAiSuggestion] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const playAlarm = useAudio('/sounds/its_time.wav');
 
-  //  useEffect(() => {
-  //   // If user has not manually set the pomos and there is a prediction
-  //   if (!pomosManuallySet.current && aiPrediction) {
-  //     setEstimatedPomos(aiPrediction);
-  //   }
-  // }, [aiPrediction]);
 
   const handleEstimatedPomosChange = (pomos: number) => {
     pomosManuallySet.current = true; // Mark as manually changed
@@ -119,14 +115,6 @@ export default function Home() {
     } finally {
       setIsEstimating(false);
     }
-
-    // // Simulate a 1-second delay
-    // setTimeout(() => {
-    //   const mockPrediction = Math.ceil(Math.random() * 5) + 1; // Random guess from 2-6
-    //   setAiSuggestion(mockPrediction);
-    //   setEstimatedPomos(mockPrediction); // Automatically apply the suggestion
-    //   setIsEstimating(false);
-    // }, 1000);
   };
 
   const handleTrainModel = async () => {
@@ -189,6 +177,7 @@ export default function Home() {
   }, [tasks]);
 
   const handleSessionComplete = (completedMode: 'focus' | 'break') => {
+    playAlarm();
     if (completedMode === 'focus' && selectedTaskId && user) {
       const task = tasks.find(t => t.id === selectedTaskId);
       if (task) {
@@ -234,6 +223,7 @@ export default function Home() {
       });
       unsubscribers.push(unsubscribe);
     });
+
     return () => unsubscribers.forEach(unsub => unsub());
   }, [user, goals]);
 
@@ -301,18 +291,46 @@ export default function Home() {
     if (!user) return;
 
     const goalData = { name: goalName, deadline: deadline };
+    const now = new Date().toISOString();
+
 
     if (goalId) {
-      await updateGoal(goalId, goalData);
+      // When updating, only name, deadline, and updatedAt are needed
+      await updateGoal(goalId, { 
+        name: goalName, 
+        deadline: deadline,
+        updatedAt: now,
+      });
     } else { // Adding new goal
-      await addGoal(goalData);
+      // When adding, createdAt and updatedAt are also required
+      await addGoal({ name: goalName, deadline: deadline, createdAt: now, updatedAt: now });
     }
   };
 
   const handleDeleteGoal = async (goalId: string) => {
     if (!user) return;
     const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
-    await deleteDoc(goalDocRef);
+    if (window.confirm("Are you sure you want to delete this goal?")) {
+      await deleteDoc(goalDocRef)
+    }
+  }
+
+  const handleArchiveGoal = async (goalId: string) => {
+      if (!user) return;
+      if (window.confirm("Are you sure you want to archive this goal?")) {
+          await archiveGoal(goalId);
+      }
+  };
+
+  const handleUnarchiveGoal = async (goalId: string) => {
+    console.log('goalId :>> ', goalId);
+    if (!user) return;
+    await unarchiveGoal(goalId);
+  }
+
+  const handleMoveMilestone = async (milestoneId: string, newGoalId: string, oldGoalId: string) => {
+    if (!user || !newGoalId || newGoalId === oldGoalId) return;
+    await moveMilestone(milestoneId, oldGoalId, newGoalId);
   };
 
   const handleSaveReflection = async (newReflectionText: string) => {
@@ -465,6 +483,11 @@ export default function Home() {
     if (!user || !expandedGoalId) return;
     const milestoneDocRef = doc(db, 'users', user.uid, 'goals', expandedGoalId, 'milestones', milestoneId);
     await updateDoc(milestoneDocRef, { status: currentStatus === 'To Do' ? 'Complete' : 'To Do' });
+  };
+
+  const handleUpdateMilestone = async (milestoneId: string, goalId: string, data: { name: string, deadline: string }) => {
+    if (!user) return;
+    await updateMilestone(goalId, milestoneId, data);
   };
   
   const handleDeleteMilestone = async (milestoneId: string) => {
@@ -620,9 +643,13 @@ export default function Home() {
                   expandedGoalId={expandedGoalId}
                   onGoalSave={handleGoalSave}
                   onGoalDelete={handleDeleteGoal}
+                  onGoalArchive={handleArchiveGoal}
+                  onGoalUnarchive={handleUnarchiveGoal}
                   onMilestoneSave={handleSaveMilestone}
                   onMilestoneToggle={handleToggleMilestoneStatus}
+                  onMilestoneUpdate={handleUpdateMilestone}
                   onMilestoneDelete={handleDeleteMilestone}
+                  onMilestoneMove={handleMoveMilestone}
                   onExpandGoal={setExpandedGoalId}
                   onClose={() => {
                     setIsGoalManagerOpen(false);
@@ -677,6 +704,7 @@ export default function Home() {
               onFocusDurationChange={setFocusDuration}
               breakDuration={breakDuration}
               onBreakDurationChange={setBreakDuration}
+              selectedTaskId={selectedTaskId}
               tasks={tasks}
               taskName={taskName}
               onTaskNameChange={setTaskName}

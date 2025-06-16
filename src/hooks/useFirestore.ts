@@ -17,7 +17,7 @@ import {
 import { db } from '@/lib/firebase';
 import { Goal } from "@/types/goal";
 import { Task } from "@/types/task";
-// import { Milestone } from "@/types/milestone";
+import { Milestone } from "@/types/milestone";
 
 export function useFirestore(user: User | null) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -85,8 +85,64 @@ export function useFirestore(user: User | null) {
   };
   const deleteGoal = async (goalId: string) => {
     if (!user) return;
-    await deleteDoc(doc(db, 'users', user.uid, 'goals', goalId));
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await deleteDoc(goalDocRef);
   };
+  const archiveGoal = async (goalId: string) => {
+    if (!user) return;
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await updateDoc(goalDocRef, { isArchived: true });
+  };
+  const unarchiveGoal = async (goalId: string) => {console.log('goalId :>> ', goalId);
+    if (!user) return;
+    const goalDocRef = doc(db, 'users', user.uid, 'goals', goalId);
+    await updateDoc(goalDocRef, { isArchived: false });
+  };
+
+  const moveMilestone = async (milestoneId: string, oldGoalId: string, newGoalId: string) => {
+    if (!user) return;
+    if (!user || !milestoneId || !oldGoalId || !newGoalId || oldGoalId === newGoalId) {
+      console.error("Invalid parameters for moveMilestone or oldGoalId is the same as newGoalId.");
+      return;
+    }
+
+    const oldMilestoneDocRef = doc(db, 'users', user.uid, 'goals', oldGoalId, 'milestones', milestoneId);
+    // The new milestone will reside in the milestones subcollection of the newGoalId
+    const newMilestoneDocRef = doc(db, 'users', user.uid, 'goals', newGoalId, 'milestones', milestoneId);
+
+    try {
+      const milestoneSnap = await getDoc(oldMilestoneDocRef);
+
+      if (!milestoneSnap.exists()) {
+        console.error(`Milestone with ID ${milestoneId} not found in goal ${oldGoalId}. Cannot move.`);
+        return;
+      }
+
+      const milestoneData = milestoneSnap.data();
+      
+      // Prepare the data for the new milestone document, ensuring its internal goalId field is updated.
+      const newMilestoneData = {
+        ...milestoneData,
+        goalId: newGoalId 
+      };
+
+      // Write the document to the new location
+      await setDoc(newMilestoneDocRef, newMilestoneData);
+
+      // Delete the document from the old location
+      await deleteDoc(oldMilestoneDocRef);
+
+    } catch (error) {
+      console.error("Error moving milestone:", error);
+    }
+  };
+
+  const updateMilestone = async (goalId: string, milestoneId: string, data: Partial<Milestone>) => {
+    if (!user) return;
+    const milestoneRef = doc(db, 'users', user.uid, 'goals', goalId, 'milestones', milestoneId);
+    await updateDoc(milestoneRef, data);
+  };
+
   const saveReflection = async (reflectionText: string, todayStr: string) => {
     if (!user) return;
     const statsDocRef = doc(db, 'users', user.uid, 'stats', 'user_stats');
@@ -102,6 +158,7 @@ export function useFirestore(user: User | null) {
     tasks, goals, streak, topStreaks,
     addTask, updateTask, deleteTask,
     addGoal, updateGoal, deleteGoal,
-    saveReflection,
+    saveReflection, archiveGoal, unarchiveGoal,
+    moveMilestone, updateMilestone,
   };
 }
