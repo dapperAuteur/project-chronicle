@@ -75,7 +75,7 @@ export default function Home() {
   const pomosManuallySet = useRef(false);
   const [aiSuggestion, setAiSuggestion] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
-  const playAlarm = useAudio('./beat_my_hi_score.wav');
+  const playAlarm = useAudio('/sounds/its_time.wav');
 
 
   const handleEstimatedPomosChange = (pomos: number) => {
