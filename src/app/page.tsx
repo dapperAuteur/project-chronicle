@@ -287,11 +287,19 @@ export default function Home() {
     if (!user) return;
 
     const goalData = { name: goalName, deadline: deadline };
+    const now = new Date().toISOString();
+
 
     if (goalId) {
-      await updateGoal(goalId, goalData);
+      // When updating, only name, deadline, and updatedAt are needed
+      await updateGoal(goalId, { 
+        name: goalName, 
+        deadline: deadline,
+        updatedAt: now,
+      });
     } else { // Adding new goal
-      await addGoal(goalData);
+      // When adding, createdAt and updatedAt are also required
+      await addGoal({ name: goalName, deadline: deadline, createdAt: now, updatedAt: now });
     }
   };
 
