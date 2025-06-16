@@ -26,14 +26,22 @@ export function useTimer({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const switchMode = useCallback(() => {
-    onSessionComplete(mode);
-    const nextMode = mode === 'focus' ? 'break' : 'focus';
-    const nextDurationInSeconds = (nextMode === 'focus' ? focusDuration : breakDuration) * 60;
-    
-    setMode(nextMode);
-    setSecondsLeft(nextDurationInSeconds);
-    setIsActive(true); // Pause timer on mode switch
-  }, [mode, focusDuration, breakDuration, onSessionComplete]);
+  // Pass the current mode to the callback before it changes
+  onSessionComplete(mode);
+
+  const nextMode = mode === 'focus' ? 'break' : 'focus';
+  const nextDurationInSeconds = (nextMode === 'focus' ? focusDuration : breakDuration) * 60;
+
+  // Set the new state
+  setMode(nextMode);
+  setSecondsLeft(nextDurationInSeconds);
+  
+  // CRITICAL FIX: Set the end time for the new session
+  endTimeRef.current = Date.now() + nextDurationInSeconds * 1000;
+
+  // Ensure the timer is active for the next session
+  setIsActive(true);
+}, [mode, focusDuration, breakDuration, onSessionComplete]);
 
   // This function now just clears the interval
   const stopTimer = useCallback(() => {
