@@ -692,6 +692,7 @@ export default function Home() {
               onFocusDurationChange={setFocusDuration}
               breakDuration={breakDuration}
               onBreakDurationChange={setBreakDuration}
+              selectedTaskId={selectedTaskId}
               tasks={tasks}
               taskName={taskName}
               onTaskNameChange={setTaskName}
