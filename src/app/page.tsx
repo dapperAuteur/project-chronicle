@@ -39,7 +39,7 @@ export default function Home() {
     tasks, goals, streak, topStreaks,
     /* addTask, */ updateTask, deleteTask,
     addGoal, updateGoal, deleteGoal, archiveGoal, unarchiveGoal,
-    saveReflection,
+    saveReflection, moveMilestone, updateMilestone,
   } = useFirestore(user);
 
   const [milestonesByGoal, setMilestonesByGoal] = useState<Record<string, Milestone[]>>({});
@@ -316,6 +316,11 @@ export default function Home() {
     await unarchiveGoal(goalId);
   }
 
+  const handleMoveMilestone = async (milestoneId: string, newGoalId: string, oldGoalId: string) => {
+    if (!user || !newGoalId || newGoalId === oldGoalId) return;
+    await moveMilestone(milestoneId, oldGoalId, newGoalId);
+  };
+
   const handleSaveReflection = async (newReflectionText: string) => {
     if (!user) return;
     const todayStr = getTodayDateString();
@@ -466,6 +471,11 @@ export default function Home() {
     if (!user || !expandedGoalId) return;
     const milestoneDocRef = doc(db, 'users', user.uid, 'goals', expandedGoalId, 'milestones', milestoneId);
     await updateDoc(milestoneDocRef, { status: currentStatus === 'To Do' ? 'Complete' : 'To Do' });
+  };
+
+  const handleUpdateMilestone = async (milestoneId: string, goalId: string, data: { name: string, deadline: string }) => {
+    if (!user) return;
+    await updateMilestone(goalId, milestoneId, data);
   };
   
   const handleDeleteMilestone = async (milestoneId: string) => {
@@ -625,7 +635,9 @@ export default function Home() {
                   onGoalUnarchive={handleUnarchiveGoal}
                   onMilestoneSave={handleSaveMilestone}
                   onMilestoneToggle={handleToggleMilestoneStatus}
+                  onMilestoneUpdate={handleUpdateMilestone}
                   onMilestoneDelete={handleDeleteMilestone}
+                  onMilestoneMove={handleMoveMilestone}
                   onExpandGoal={setExpandedGoalId}
                   onClose={() => {
                     setIsGoalManagerOpen(false);
